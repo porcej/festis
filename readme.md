@@ -15,6 +15,18 @@ python3.4+
 $pip install -r requirements.txt
 ```
 
+
+### Optional Prerequisites
+
+The python [requests-ntlm](https://github.com/requests/requests-ntlm) module can optionally be used to authenticate with Workforce Telestaff installations behind a NTLM Challenge-Response authorization mechanizm.  
+
+```
+
+pip install requests_ntlm
+
+``` 
+
+
 ### Installation
 
 This package can be installed from github:

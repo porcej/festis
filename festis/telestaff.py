@@ -29,7 +29,11 @@ __version__ = '0.0.4' #Versioning: http://www.python.org/dev/peps/pep-0386/
 
 
 import urllib, base64, requests
-import requests_ntlm
+
+# Optionally import requests_ntlm for the case where
+# NTLM auth is not requeired
+try: from requests_ntlm import HttpNtlmAuth
+except ImportError: HttpNtlmAuth = None
 from bs4 import BeautifulSoup
 from datetime import datetime
 import re
@@ -461,8 +465,9 @@ class Telestaff():
 
         # Added 3/5/2018 
         # This fails to NTLM Auth if an unathorized error is received
+        # Updated on 16/12/2018 - cleaned up NTLM Auth
         if loginPage.status_code == 401:
-            self.session.auth = requests_ntlm.HttpNtlmAuth(self.domainUser(), self.creds['domain_pass']) 
+            self.session.auth = HttpNtlmAuth(self.domainUser(), self.creds['domain_pass']) 
             loginPage = self.session.get(self.makeURL('/login'));
 
         soup = BeautifulSoup(loginPage.text.encode('utf-8'), self.parser)
