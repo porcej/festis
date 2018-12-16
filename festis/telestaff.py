@@ -16,6 +16,7 @@ Changelog:
     - 2018-03-12 - Updated getMemberInfo to handle formating workcodes from SVGs
     - 2018-06-12 - Refactored to be Object Oriented
     - 2018-07-26 - Update parsing of Telestaff to indicate nonWorking work codes
+    - 2018-12-16 - Update URL handling to better encode dates
 
 
 """
@@ -24,7 +25,7 @@ __author__ = 'Joe Porcelli (porcej@gmail.com)'
 __copyright__ = 'Copyright (c) 2017 Joe Porcelli'
 __license__ = 'New-style BSD'
 __vcs_id__ = '$Id$'
-__version__ = '0.0.3' #Versioning: http://www.python.org/dev/peps/pep-0386/
+__version__ = '0.0.4' #Versioning: http://www.python.org/dev/peps/pep-0386/
 
 
 import urllib, base64, requests
@@ -531,7 +532,7 @@ class Telestaff():
 
         if kind:
             if kind == 'roster':
-                action = '/roster/d[' + date + ']/'
+                action = '/roster/d%5B' + date + '%5D/'
                 handler = self.parseWebStaffRoster
             elif kind == 'calendar':
                 action = '/calendar/' + date + '/list/'
