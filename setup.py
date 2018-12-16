@@ -37,7 +37,7 @@ try:
 except ImportError:
     from distutils.core import setup, Command
 
-from a911 import __version__
+from festis import __version__
 
 VERSION          = __version__
 DESCRIPTION      = 'A tiny Python client for Workforce Telestaff.'
@@ -55,7 +55,7 @@ CLASSIFIERS      = [ 'Intended Audience :: Developers',
                      'Topic :: Software Development :: Libraries :: Python Modules',
                    ]
 
-packages     = [ 'telestaff' ]
+packages     = [ 'festis' ]
 
 setup(
     name             = "festis",
