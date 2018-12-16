@@ -466,7 +466,7 @@ class Telestaff():
         # Added 3/5/2018 
         # This fails to NTLM Auth if an unathorized error is received
         # Updated on 16/12/2018 - cleaned up NTLM Auth
-        if loginPage.status_code == 401:
+        if (loginPage.status_code == 401) and (HttpNtlmAuth is not None):
             self.session.auth = HttpNtlmAuth(self.domainUser(), self.creds['domain_pass']) 
             loginPage = self.session.get(self.makeURL('/login'));
 
