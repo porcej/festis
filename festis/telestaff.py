@@ -17,6 +17,7 @@ Changelog:
     - 2018-06-12 - Refactored to be Object Oriented
     - 2018-07-26 - Update parsing of Telestaff to indicate nonWorking work codes
     - 2018-12-16 - Update URL handling to better encode dates
+    - 2018-12-16 - Added logging support
 
 
 """
@@ -38,6 +39,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 import re
 import yaml
+import logging
 
 
 # Import JSON... Try Simple if its available and default to stdlib
@@ -65,14 +67,23 @@ class Telestaff():
         'domain_pass': ''
     }
 
+    app = None
+    logger = logging
+
 
 
     def __init__(self, host, 
                 t_user=None, t_pass=None, 
-                domain=None, d_user=None, d_pass=None):
+                domain=None, d_user=None, d_pass=None,
+                app=None):
         """
         Initilize Telestaff Client
         """
+
+        if app:
+            self.app = app
+            self.logger=app.logger
+
 
         # We will attempt to us lxml parser... 
         #     but we will fail back to html.parser just incase
