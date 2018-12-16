@@ -18,6 +18,7 @@ Changelog:
     - 2018-07-26 - Update parsing of Telestaff to indicate nonWorking work codes
     - 2018-12-16 - Update URL handling to better encode dates
     - 2018-12-16 - Added logging support
+    - 2018-12-16 - Changed how position title is obtained in WT 6.7.0
 
 
 """
@@ -147,11 +148,15 @@ class Telestaff():
         
         tmp = soup.find("div", {"class": nameClasses})
 
+        if tmp:
+            if tmp.span.text.strip():
+                titleSpan = tmp.span.text.strip()
+            else:
+                titleSpan = tmp.find("span", {"class": 'positionNameText'}).text
 
-        if tmp and tmp.span.text:
             # m = re.search('^((\+)?(\.)?([^{]*).?([^}]*))?', tmp.span.text)
-            nameAndNotes["title"] = tmp.span.text
-            m = re.search('^((\+)?(\.)?([^{]*).?([^}]*))?', tmp.span.text)
+            nameAndNotes["title"] = titleSpan
+            m = re.search('^((\+)?(\.)?([^{]*).?([^}]*))?', titleSpan)
             if m.lastindex and m.lastindex > 1:
                 if m.group(4):
                     nameAndNotes["title"] = m.group(4).strip()
@@ -162,9 +167,10 @@ class Telestaff():
                 if m.group(2):
                     nameAndNotes["extra"] = True
             else:
-                m = re.search('^([^{]*){?([^}]*)}?', tmp.span.text)
+                m = re.search('^([^{]*){?([^}]*)}?', titleSpan)
                 if m.group(1):
                     nameAndNotes["title"] = m.group(1).strip()
+                    print(nameAndNotes['title'])
                 if m.group(2):
                     nameAndNotes["notes"] = m.group(2).strip()
 
