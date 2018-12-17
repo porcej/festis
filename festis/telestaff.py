@@ -19,6 +19,7 @@ Changelog:
     - 2018-12-16 - Update URL handling to better encode dates
     - 2018-12-16 - Added logging support
     - 2018-12-16 - Changed how position title is obtained in WT 6.7.0
+    - 2018-12-17 - Added a flag to the init option to control SSL Cert Verification
 
 
 """
@@ -65,7 +66,8 @@ class Telestaff():
         },
         'domain': '',
         'domain_user': '',
-        'domain_pass': ''
+        'domain_pass': '',
+        'verify_ssl_cert': True
     }
 
     app = None
@@ -76,7 +78,7 @@ class Telestaff():
     def __init__(self, host, 
                 t_user=None, t_pass=None, 
                 domain=None, d_user=None, d_pass=None,
-                app=None):
+                verify_ssl_cert=True, app=None):
         """
         Initilize Telestaff Client
         """
@@ -101,6 +103,7 @@ class Telestaff():
         self.creds['domain'] = domain
         self.creds['domain_user'] = d_user
         self.creds['domain_pass'] = d_pass
+        self.creds['verify_ssl_cert'] =verify_ssl_cert
 
     def domainUser(self):
         """
@@ -170,7 +173,6 @@ class Telestaff():
                 m = re.search('^([^{]*){?([^}]*)}?', titleSpan)
                 if m.group(1):
                     nameAndNotes["title"] = m.group(1).strip()
-                    print(nameAndNotes['title'])
                 if m.group(2):
                     nameAndNotes["notes"] = m.group(2).strip()
 
@@ -464,6 +466,7 @@ class Telestaff():
     # Logsin and returns session object... if login fails returns false
     def doLogin(self):
         self.session = requests.Session()
+        self.session.verify = self.creds['verify_ssl_cert']
 
         login = {
             'status_code': '403'
