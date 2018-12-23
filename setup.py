@@ -55,6 +55,13 @@ CLASSIFIERS      = [ 'Intended Audience :: Developers',
                      'Topic :: Software Development :: Libraries :: Python Modules',
                    ]
 
+REQUIREMENTS    = [
+                    'beautifulsoup4==4.6.0',
+                    'DateTime==4.2',
+                    'requests==2.21.0',
+                    'PyYAML==3.12'
+                ]
+
 packages     = [ 'festis' ]
 
 setup(
@@ -62,12 +69,13 @@ setup(
     version          = VERSION,
     description      = DESCRIPTION,
     long_description = LONG_DESCRIPTION,
+    long_description_content_type = "text/markdown",
     author       = 'Joe Porcelli',
     author_email = 'joe@kt3i.com',
     url          = 'http://github.com/porcej/festis',
     license      = 'MIT',
     platforms    = [ 'any' ],
     packages     = packages,
-    requires     = [ 'base64', 'requests' ],
+    requires     = REQUIREMENTS,
     classifiers  = CLASSIFIERS
 )
