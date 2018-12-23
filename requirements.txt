@@ -1,4 +1,4 @@
 beautifulsoup4==4.6.0
 DateTime==4.2
-requests==2.14.2
+requests==2.21.0
 PyYAML==3.12
