@@ -584,16 +584,17 @@ class Telestaff():
 
             if not date:
                 date = self.currentDate()
+            thisHost = urllib.parse.urlparse(self.url).hostname
 
             rURL = self.makeURL('/schedule/pickList/fromCalendar/' + date + '/675?returnUrl=%2Fcalendar%2F'+ date + '%2F675')
             self.session.headers.update({
-                    'Host': urlHost(),
+                    'Host': thisHost,
                     'Referer': rURL,
                     'Accept': 'application/json, text/javascript, */*; q=0.01',
                     'X-Requested-With': 'XMLHttpRequest'
                 })
 
-            # response = self.session.get(rURL)
+            response = self.session.get(rURL)
 
             response = self.session.get(self.makeURL('/schedule/pickList/tableAjaxData'))
 
@@ -601,6 +602,7 @@ class Telestaff():
             if (response.status_code == requests.codes.ok):
                 if (not response.url.endswith('login')):
                     # rjson = handler(response.text)
+                    print(response.text.encode('utf-8'))
                     data = response.json();
                     data['type'] = 'picklist';
                     return json.dumps({'status_code': '200', 'data': data})
