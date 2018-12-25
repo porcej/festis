@@ -489,6 +489,10 @@ class Telestaff():
         if (loginPage.status_code == 401) and (HttpNtlmAuth is not None):
             self.session.auth = HttpNtlmAuth(self.domainUser(), self.creds['domain_pass']) 
             loginPage = self.session.get(self.makeURL('/login'));
+            
+        if (loginPage.status_code != 200):
+            login['status_code'] = loginPage.status_code
+            return login
 
         soup = BeautifulSoup(loginPage.text.encode('utf-8'), self.parser)
         
