@@ -419,7 +419,7 @@ class Telestaff():
                 box = box.div
 
                 if box.has_attr('style'):
-                    event['icon_style'] = cleanString(box['style'])
+                    event['icon_style'] = self.cleanString(box['style'])
 
                 events.append(event)
 
@@ -491,7 +491,7 @@ class Telestaff():
             loginPage = self.session.get(self.makeURL('/login'));
 
         soup = BeautifulSoup(loginPage.text.encode('utf-8'), self.parser)
-
+        
         # Find the token in soup tree and through away everything else
         self.creds['telestaff']['CSRFToken'] = soup.find("input", {"name": "CSRFToken"}).get('value');
         
