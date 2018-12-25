@@ -20,6 +20,8 @@ Changelog:
     - 2018-12-16 - Added logging support
     - 2018-12-16 - Changed how position title is obtained in WT 6.7.0
     - 2018-12-17 - Added a flag to the init option to control SSL Cert Verification
+    - 2018-12-25 - Updated handling for invalid domain credentials
+    - 2018-12-25 - Updated several typos
 
 
 """
@@ -583,7 +585,7 @@ class Telestaff():
             if not date:
                 date = self.currentDate()
 
-            rURL = makeURL('/schedule/pickList/fromCalendar/' + date + '/675?returnUrl=%2Fcalendar%2F'+ date + '%2F675')
+            rURL = self.makeURL('/schedule/pickList/fromCalendar/' + date + '/675?returnUrl=%2Fcalendar%2F'+ date + '%2F675')
             self.session.headers.update({
                     'Host': urlHost(),
                     'Referer': rURL,
