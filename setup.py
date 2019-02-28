@@ -26,6 +26,7 @@ Changelog:
     - 2018-07-26 - Update parsing of Telestaff to indicate nonWorking 
                     work codes
     - 2018-12-16 - Update URL handling to better encode dates
+    - 2019-02-27 - Replaced requires with install_requires
 
 
 """
@@ -76,6 +77,6 @@ setup(
     license      = 'MIT',
     platforms    = [ 'any' ],
     packages     = packages,
-    requires     = REQUIREMENTS,
+    install_requires     = REQUIREMENTS,
     classifiers  = CLASSIFIERS
 )
