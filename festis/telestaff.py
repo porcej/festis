@@ -22,6 +22,8 @@ Changelog:
     - 2018-12-17 - Added a flag to the init option to control SSL Cert Verification
     - 2018-12-25 - Updated handling for invalid domain credentials
     - 2018-12-25 - Updated several typos
+    - 2019-05-23 - Updated getRosterNameField to remove etra status and make the regex more efficient
+    - 2019-05-23 - Updated getTelestaffPicklist to handle picklists outside the default
 
 
 """
@@ -71,6 +73,7 @@ class Telestaff():
         'domain_pass': '',
         'verify_ssl_cert': True
     }
+
 
     app = None
     logger = logging
@@ -126,7 +129,6 @@ class Telestaff():
         return self.url + path
 
 
-
     def currentDate(self):
         return datetime.now().strftime('%Y%m%d')
 
@@ -149,7 +151,7 @@ class Telestaff():
     def getRosterNameField(self, soup):
         """Returns name and notes for Workforce Telestaff's Name Div"""
         nameClasses = ['dateName', 'organizationName', 'battalionName', 'shiftName', 'unitName', 'positionName']
-        nameAndNotes = {"title": '', "notes":'', "dot": False, "extra": False}
+        nameAndNotes = {"title": '', "notes":'', "isSurrpressed": False}
         
         tmp = soup.find("div", {"class": nameClasses})
 
@@ -159,24 +161,17 @@ class Telestaff():
             else:
                 titleSpan = tmp.find("span", {"class": 'positionNameText'}).text
 
-            # m = re.search('^((\+)?(\.)?([^{]*).?([^}]*))?', tmp.span.text)
             nameAndNotes["title"] = titleSpan
-            m = re.search('^((\+)?(\.)?([^{]*).?([^}]*))?', titleSpan)
+
+            m = re.search('^({?(\.)?[^{]*){?([^}]*)}?', titleSpan)
             if m.lastindex and m.lastindex > 1:
-                if m.group(4):
-                    nameAndNotes["title"] = m.group(4).strip()
-                if m.group(5):
-                    nameAndNotes["notes"] = m.group(5).strip()
-                if m.group(3):
-                    nameAndNotes["dot"] = True
-                if m.group(2):
-                    nameAndNotes["extra"] = True
-            else:
-                m = re.search('^([^{]*){?([^}]*)}?', titleSpan)
                 if m.group(1):
                     nameAndNotes["title"] = m.group(1).strip()
                 if m.group(2):
-                    nameAndNotes["notes"] = m.group(2).strip()
+                    nameAndNotes['isSurrpressed'] = True
+                if m.group(3):
+                    if not nameAndNotes['isSurrpressed']:
+                        nameAndNotes['notes'] = m.group(3).strip()
 
         return nameAndNotes
 
@@ -238,15 +233,20 @@ class Telestaff():
                 "endTime": "", 
                 "duration": 24, 
                 "isWorking": True, 
-                "isAssigned": True}
+                "isAssigned": True,
+                "isVacant": False}
 
         # Look for nonWorking Code
         if( soup.find('div', attrs={"class": 'nonWorking'})):
             data["isWorking"] = False
 
-        # Look for 
+        # Look for isAssigned 
         if (soup.find('div', attrs={"class": "unassignedPosition"})):
             data['isAssigned'] = False
+
+        # Is this position vacant?
+        if (soup.find('div', attrs={"class": 'vacancyDisplay'})):
+            data['isVacant'] = True
 
         # Get Personal Info
         resourceDisplay = soup.find("div", attrs={"data-field": "resourcedisplay"})
@@ -576,8 +576,12 @@ class Telestaff():
         return self.getTelestaffData(action, handler)
 
 
-    def getTelestaffPicklist(self, date=''):
-        
+    def getTelestaffPicklist(self, date='', picklist=None):
+        """
+        Fetch a Telestaff picklist.
+        If picklist is None, fetchs default picklist else fetches listed picklist
+        """
+
         # Authenticate against the system and establish a session
         login = self.doLogin()
         if (login['status_code'] == requests.codes.ok):
@@ -595,6 +599,13 @@ class Telestaff():
                 })
 
             response = self.session.get(rURL)
+
+            if picklist is not None:
+                # The following should be uncomment if Telestaff ever enforces CORS protection
+                # soup = BeautifulSoup(response.text.encode('utf-8'), self.parser)
+                # picklist['CSRFToken'] = soup.find("input", {"name": "CSRFToken"}).get('value');
+
+                response = self.session.post(self.makeURL('/schedule/pickList/setPickListProperty'), data=picklist)
 
             response = self.session.get(self.makeURL('/schedule/pickList/tableAjaxData'))
 
