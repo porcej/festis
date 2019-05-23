@@ -60,7 +60,7 @@ REQUIREMENTS    = [
                     'beautifulsoup4==4.6.0',
                     'DateTime==4.2',
                     'requests==2.21.0',
-                    'PyYAML==3.12'
+                    'pyyaml>=4.2b1'
                 ]
 
 packages     = [ 'festis' ]
