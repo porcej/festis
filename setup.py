@@ -59,7 +59,7 @@ CLASSIFIERS      = [ 'Intended Audience :: Developers',
 REQUIREMENTS    = [
                     'beautifulsoup4==4.6.0',
                     'DateTime==4.2',
-                    'requests==2.21.0',
+                    'requests>=2.21.0',
                     'pyyaml>=4.2b1'
                 ]
 

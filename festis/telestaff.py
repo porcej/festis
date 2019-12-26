@@ -24,6 +24,11 @@ Changelog:
     - 2018-12-25 - Updated several typos
     - 2019-05-23 - Updated getRosterNameField to remove etra status and make the regex more efficient
     - 2019-05-23 - Updated getTelestaffPicklist to handle picklists outside the default
+    - 2019-12-25 - Updated doLogin to resepect the object's 'verify_ssl_cert' state
+    - 2019-12-25 - Extracted all Telestaff Resource End Points to resourceURL() method
+    - 2019-12-25 - Added handler method that returns the parser for resource type requested
+    =======================================================================================
+    * 2019-12-25 - Moved to version 0.0.7
 
 
 """
@@ -32,7 +37,7 @@ __author__ = 'Joe Porcelli (porcej@gmail.com)'
 __copyright__ = 'Copyright (c) 2017 Joe Porcelli'
 __license__ = 'New-style BSD'
 __vcs_id__ = '$Id$'
-__version__ = '0.0.6' #Versioning: http://www.python.org/dev/peps/pep-0386/
+__version__ = '0.0.7' #Versioning: http://www.python.org/dev/peps/pep-0386/
 
 
 import urllib, base64, requests
@@ -74,10 +79,8 @@ class Telestaff():
         'verify_ssl_cert': True
     }
 
-
     app = None
     logger = logging
-
 
 
     def __init__(self, host, 
@@ -103,12 +106,70 @@ class Telestaff():
 
         self.url = host
 
+        # Initialize connection parameters
         self.creds['telestaff']['username'] = t_user
         self.creds['telestaff']['password'] = t_pass
         self.creds['domain'] = domain
         self.creds['domain_user'] = d_user
         self.creds['domain_pass'] = d_pass
-        self.creds['verify_ssl_cert'] =verify_ssl_cert
+        self.creds['verify_ssl_cert'] = verify_ssl_cert
+
+        # Initilize session object   
+        self.session = requests.Session()
+        self.session.verify = self.creds['verify_ssl_cert']
+        self.session.headers.update({'User-Agent': self.userAgent})
+
+
+    def resourceURL(self, resource_type=None, date=None):
+        """
+        Accepts optional resource_type (string) and date (string)
+        and returns a string representation of that resource's url
+        Defaults:
+            resource_type: 'dashboard'
+            date: The current date
+        Returns false for unknown resource types
+        """
+
+        # If resourse is not provided assume dashboard
+        if resource_type is None:
+            resource_type = 'dashboard'
+
+        # If date is not provided, assume today
+        if date is None:
+            date = self.currentDate()
+
+        urls = {
+            'loginPage':        '/login',
+            'login':            '/processWebLogin',
+            'contactLog':       '/contactLog?myContactLog=true',
+            'dispoContactLog':  '/contactLog?dispositionedUnrespondedLogs=true',
+            'pickList':         '/schedule/pickList/fromCalendar/' + date + '/675?returnUrl=%2Fcalendar%2F'+ date + '%2F675',
+            'customPickList':   '/schedule/pickList/setPickListProperty',
+            'pickListData':     '/schedule/pickList/tableAjaxData',
+            'roster':           '/roster/d%5B' + date + '%5D/',
+            'calendar':         '/calendar/' + date + '/list/',
+            'dashboard':        '/calendar/dashboard'
+        }
+
+        if resource_type not in urls.keys():
+            return False
+
+        return self.makeURL(urls[resource_type])
+
+    def handler(self, kind='dashboard'):
+        """
+        Accepts a handler name and returns a link to its handler
+        if the handler is unknown, returns false
+        """
+        if kind == 'dashboard':
+            return self.parseCalendarDashboard
+        elif kind == 'roster':
+            return self.parseWebStaffRoster
+        elif kind == 'calendar':
+            return self.parseFullCalendar
+        else:
+            return False
+
 
     def domainUser(self):
         """
@@ -116,7 +177,7 @@ class Telestaff():
         """
         return self.creds['domain'] + self.creds['domain_user'];
 
-    
+
     def makeURL(self, path=''):
         """
         Build URL's for Telestaff Paths
@@ -465,32 +526,27 @@ class Telestaff():
 
         return data
 
-    # Logsin and returns session object... if login fails returns false
+    # Logs in and returns session object... if login fails returns false
     def doLogin(self):
-        self.session = requests.Session()
-        self.session.verify = self.creds['verify_ssl_cert']
 
-        login = {
-            'status_code': '403'
-        }
+        # Holder for HTTP response codes
+        login = { 'status_code': '403' }
 
-        self.session.headers.update({'User-Agent': self.userAgent})
-
-        # Removed on 3/5/2018 to accomidate in network connections
-        # login['session'] = requests.Session()
-        # login['session'].auth = requests_ntlm.HttpNtlmAuth(authDomain() + dname, dpass, login['session'])
-        
-        # Get CSRFToken from login page
-        # Added 3/1/2018
-        # loginPage = self.session.get(self.makeURL('/login'), verify=False);
-        loginPage = self.session.get(self.makeURL('/login'), verify=True);
+        # Updated 25/12/2019
+        # Removed verify=True, as this is done in the session.verify statement above
+        loginPage = self.session.get(self.resourceURL('loginPage'));
 
         # Added 3/5/2018 
         # This fails to NTLM Auth if an unathorized error is received
         # Updated on 16/12/2018 - cleaned up NTLM Auth
         if (loginPage.status_code == 401) and (HttpNtlmAuth is not None):
-            self.session.auth = HttpNtlmAuth(self.domainUser(), self.creds['domain_pass']) 
-            loginPage = self.session.get(self.makeURL('/login'));
+            
+            # Build NTLM Authenication Object
+            self.session.auth = HttpNtlmAuth( \
+                                             self.domainUser(),\
+                                             self.creds['domain_pass'])
+
+            loginPage = self.session.get(self.resourceURL('loginPage'));
             
         if (loginPage.status_code != 200):
             login['status_code'] = loginPage.status_code
@@ -499,12 +555,14 @@ class Telestaff():
         soup = BeautifulSoup(loginPage.text.encode('utf-8'), self.parser)
         
         # Find the token in soup tree and through away everything else
-        self.creds['telestaff']['CSRFToken'] = soup.find("input", {"name": "CSRFToken"}).get('value');
+        self.creds['telestaff']['CSRFToken'] = \
+                soup.find("input", {"name": "CSRFToken"}).get('value');
         
 
         # Login in to Workforce Telestaff
-        # 2018-02/28 - Changled login location from processWebLogin to login
-        loginResponse = self.session.post(self.makeURL('/processWebLogin'), data=self.creds['telestaff'])
+        # 28-12-2019 - Changed login location from login to processWebLogin
+        loginResponse = self.session.post( self.resourceURL('login'), \
+                                           data=self.creds['telestaff'])
         #   loginResponse = login['session'].post(makeURL('/login'), data=payload)
         
         # Added 2/8/2018 to handle Check Contact Log Messages
@@ -514,8 +572,8 @@ class Telestaff():
         #        Secondly) Disposition Unresponded logs (/contactLog?dispositionedUnrespondedLogs=true)
         # If we are we request to disposition the contact log for this session 
         if (loginResponse.url.endswith('/checkContactLog')):
-            contactResponse = self.session.get(self.makeURL('/contactLog?myContactLog=true'))
-            loginResponse = self.session.get(self.makeURL('/contactLog?dispositionedUnrespondedLogs=true'))
+            contactResponse = self.session.get(self.resourceURL('contectLog'))
+            loginResponse = self.session.get(self.resourceURL('dispoContactLog'))
         
         login['status_code'] = loginResponse.status_code
 
@@ -529,7 +587,7 @@ class Telestaff():
         # Check to see if login suceceed:
         if (login['status_code'] == requests.codes.ok):
 
-            response = self.session.get(self.makeURL(path))
+            response = self.session.get(path)
 
             if (response.status_code == requests.codes.ok):
                 if (not response.url.endswith('login')):
@@ -551,25 +609,26 @@ class Telestaff():
         return self.getTelestaff(kind='roster', date=date, jsonExport=jsonExport)
 
 
-    def getTelestaffDashboard(self, jsonExport=False):
+    def getTelestaffDashboard(self, date=None, jsonExport=False):
         return self.getTelestaff(kind='dashboard', date=None, jsonExport=jsonExport)
 
 
     def getTelestaff(self, kind='dashboard', date=None, jsonExport=True):
-        if date is None:
-            date = self.currentDate()
+        """
+        Gets Data from telestaff of type kind
+        If jsonExport is true, returns Json, otherwise returns data object
+        Defaults:
+            kind - Dashboard
+            date - None
+        """
         handler = self.parseCalendarDashboard
-        action = '/calendar/dashboard/'
+        action = self.resourceURL()
 
-        if kind:
-            if kind == 'roster':
-                action = '/roster/d%5B' + date + '%5D/'
-                handler = self.parseWebStaffRoster
-            elif kind == 'calendar':
-                action = '/calendar/' + date + '/list/'
-                handler = self.parseFullCalendar
-            elif kind == 'picklist':
-                return self.getTelestaffPicklist(date)
+        if  kind == 'picklist':
+            return self.getTelestaffPicklist(date)
+        else:
+            action = self.resourceURL(resource_type=kind, date=date)
+            handler = self.handler(kind=kind)
 
         if jsonExport:
             return json.dumps(self.getTelestaffData(action, handler))
@@ -590,7 +649,7 @@ class Telestaff():
                 date = self.currentDate()
             thisHost = urllib.parse.urlparse(self.url).hostname
 
-            rURL = self.makeURL('/schedule/pickList/fromCalendar/' + date + '/675?returnUrl=%2Fcalendar%2F'+ date + '%2F675')
+            rURL = self.resourceURL(resource_type=pickList, date=date)
             self.session.headers.update({
                     'Host': thisHost,
                     'Referer': rURL,
@@ -605,15 +664,14 @@ class Telestaff():
                 # soup = BeautifulSoup(response.text.encode('utf-8'), self.parser)
                 # picklist['CSRFToken'] = soup.find("input", {"name": "CSRFToken"}).get('value');
 
-                response = self.session.post(self.makeURL('/schedule/pickList/setPickListProperty'), data=picklist)
+                response = self.session.post(self.resourceURL('customPickList'), data=picklist)
 
-            response = self.session.get(self.makeURL('/schedule/pickList/tableAjaxData'))
+            response = self.session.get(self.resourceURL('pickListData'))
 
             
             if (response.status_code == requests.codes.ok):
                 if (not response.url.endswith('login')):
                     # rjson = handler(response.text)
-                    print(response.text.encode('utf-8'))
                     data = response.json();
                     data['type'] = 'picklist';
                     return json.dumps({'status_code': '200', 'data': data})
