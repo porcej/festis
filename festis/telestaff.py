@@ -29,7 +29,7 @@ Changelog:
     - 2019-12-25 - Added handler method that returns the parser for resource type requested
     =======================================================================================
     * 2019-12-25 - Moved to version 0.0.7
-
+    - 2021-02-09 - Updated to Support WF 7.1.16
 
 """
 
@@ -331,7 +331,8 @@ class Telestaff():
             if styleSpan.has_attr('style'):
                 data['workcode_style'] = styleSpan['style']
                 
-            rect = codes.find('svg', attrs={'class': 'rosterSvg'}).rect
+            # rect = codes.find('svg', attrs={'class': 'rosterSvg'}).rect 
+            rect = codes.find('svg', attrs={'class': 'svg'}).rect   # Support WF Telestaff 7.1.16
             if rect.has_attr('style'):
                 data['workcode_style'] += "background-color: " + rect['style'].replace('fill:','')
             
