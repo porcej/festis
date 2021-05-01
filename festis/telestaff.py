@@ -30,6 +30,7 @@ Changelog:
     =======================================================================================
     * 2019-12-25 - Moved to version 0.0.7
     - 2021-02-09 - Updated to Support WF 7.1.16
+    - 2021-05-01 - corrected error in fetching picklist by quaoting keyboard picklist in resourceURL call
 
 """
 
@@ -86,7 +87,7 @@ class Telestaff():
     def __init__(self, host, 
                 t_user=None, t_pass=None, 
                 domain=None, d_user=None, d_pass=None,
-                verify_ssl_cert=True, app=None):
+                verify_ssl_cert=False, app=None):
         """
         Initilize Telestaff Client
         """
@@ -650,7 +651,7 @@ class Telestaff():
                 date = self.currentDate()
             thisHost = urllib.parse.urlparse(self.url).hostname
 
-            rURL = self.resourceURL(resource_type=pickList, date=date)
+            rURL = self.resourceURL(resource_type='pickList', date=date)
             self.session.headers.update({
                     'Host': thisHost,
                     'Referer': rURL,
