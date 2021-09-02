@@ -32,6 +32,7 @@ Changelog:
     - 2021-02-09 - Updated to Support WF 7.1.16
     - 2021-05-01 - corrected error in fetching picklist by quaoting keyboard picklist in resourceURL call
     - 2021-09-02 - Added the ability to select picklist by chain
+    - 2021-09-02 - Added full forster functionality
 
 """
 
@@ -149,6 +150,7 @@ class Telestaff():
             'customPickList':   '/schedule/pickList/setPickListProperty',
             'pickListData':     '/schedule/pickList/tableAjaxData',
             'roster':           '/roster/d%5B' + date + '%5D/',
+            'rosterFull':       '/roster/d%5B' + date + '%5D?rosterViewId=-1_3',
             'calendar':         '/calendar/' + date + '/list/',
             'dashboard':        '/calendar/dashboard'
         }
@@ -166,6 +168,8 @@ class Telestaff():
         if kind == 'dashboard':
             return self.parseCalendarDashboard
         elif kind == 'roster':
+            return self.parseWebStaffRoster
+        elif kind == 'rosterFull':
             return self.parseWebStaffRoster
         elif kind == 'calendar':
             return self.parseFullCalendar
