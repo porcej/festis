@@ -31,6 +31,7 @@ Changelog:
     * 2019-12-25 - Moved to version 0.0.7
     - 2021-02-09 - Updated to Support WF 7.1.16
     - 2021-05-01 - corrected error in fetching picklist by quaoting keyboard picklist in resourceURL call
+    - 2021-09-02 - Added the ability to select picklist by chain
 
 """
 
@@ -615,7 +616,7 @@ class Telestaff():
         return self.getTelestaff(kind='dashboard', date=None, jsonExport=jsonExport)
 
 
-    def getTelestaff(self, kind='dashboard', date=None, jsonExport=True):
+    def getTelestaff(self, kind='dashboard', date=None, jsonExport=True, chain=None):
         """
         Gets Data from telestaff of type kind
         If jsonExport is true, returns Json, otherwise returns data object
@@ -627,7 +628,7 @@ class Telestaff():
         action = self.resourceURL()
 
         if  kind == 'picklist':
-            return self.getTelestaffPicklist(date)
+            return self.getTelestaffPicklist(date, chain)
         else:
             action = self.resourceURL(resource_type=kind, date=date)
             handler = self.handler(kind=kind)
@@ -637,7 +638,7 @@ class Telestaff():
         return self.getTelestaffData(action, handler)
 
 
-    def getTelestaffPicklist(self, date='', picklist=None):
+    def getTelestaffPicklist(self, date='', chain=None):
         """
         Fetch a Telestaff picklist.
         If picklist is None, fetchs default picklist else fetches listed picklist
@@ -661,10 +662,15 @@ class Telestaff():
 
             response = self.session.get(rURL)
 
-            if picklist is not None:
-                # The following should be uncomment if Telestaff ever enforces CORS protection
-                # soup = BeautifulSoup(response.text.encode('utf-8'), self.parser)
-                # picklist['CSRFToken'] = soup.find("input", {"name": "CSRFToken"}).get('value');
+            if chain is not None:
+                picklist = {}
+                soup = BeautifulSoup(response.text.encode('utf-8'), self.parser)
+                print(soup.find("input", {"name": "CSRFToken"}).get('value'))
+                picklist['date'] = soup.find("input", {"name": "date"}).get('value')
+                picklist['regionTbl'] = soup.find("select", {"name": "regionTbl"}).find('option', selected=True).get('value')
+                picklist['shiftTbl'] = soup.find("select", {"name": "shiftTbl"}).find('option', selected=True).get('value')
+                picklist['strategyChainTbl'] = chain
+                picklist['CSRFToken'] = soup.find("input", {"name": "CSRFToken"}).get('value');
 
                 response = self.session.post(self.resourceURL('customPickList'), data=picklist)
 
@@ -682,7 +688,6 @@ class Telestaff():
             else:
                 return {'status_code': response.status_code}
         return {'status_code': '403', 'data': 'Authentication or authorization issue. Code: ' + str(login['status_code']) + '.' }
-
 
 
 
