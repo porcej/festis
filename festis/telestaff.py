@@ -665,7 +665,6 @@ class Telestaff():
             if chain is not None:
                 picklist = {}
                 soup = BeautifulSoup(response.text.encode('utf-8'), self.parser)
-                print(soup.find("input", {"name": "CSRFToken"}).get('value'))
                 picklist['date'] = soup.find("input", {"name": "date"}).get('value')
                 picklist['regionTbl'] = soup.find("select", {"name": "regionTbl"}).find('option', selected=True).get('value')
                 picklist['shiftTbl'] = soup.find("select", {"name": "shiftTbl"}).find('option', selected=True).get('value')
