@@ -89,7 +89,7 @@ class Telestaff():
     def __init__(self, host, 
                 t_user=None, t_pass=None, 
                 domain=None, d_user=None, d_pass=None,
-                verify_ssl_cert=False, app=None):
+                verify_ssl_cert=True, app=None):
         """
         Initilize Telestaff Client
         """
