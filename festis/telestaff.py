@@ -32,7 +32,9 @@ Changelog:
     - 2021-02-09 - Updated to Support WF 7.1.16
     - 2021-05-01 - corrected error in fetching picklist by quaoting keyboard picklist in resourceURL call
     - 2021-09-02 - Added the ability to select picklist by chain
-    - 2021-09-02 - Added full forster functionality
+    - 2021-09-02 - Added full roster functionality
+    - 2022-11-13 - Added position id
+
 
 """
 
