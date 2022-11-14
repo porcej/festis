@@ -290,7 +290,8 @@ class Telestaff():
     #  Updated on 2018/03/12 to handle workcode formating using SVG
     #  Updated on 2018/07/26 to handle nonWorking code and unassignedPosition code
     def getMemberInfo(self, soup):
-        data = {"name": "", 
+        data = {"id": 0, 
+                "name": "", 
                 "specialties": "", 
                 "badge": "", 
                 "workcode": "", 
@@ -302,6 +303,8 @@ class Telestaff():
                 "isWorking": True, 
                 "isAssigned": True,
                 "isVacant": False}
+
+        data['id'] = soup['data-id']
 
         # Look for nonWorking Code
         if( soup.find('div', attrs={"class": 'nonWorking'})):
