@@ -82,7 +82,8 @@ class Telestaff():
         'domain': '',
         'domain_user': '',
         'domain_pass': '',
-        'verify_ssl_cert': True
+        'verify_ssl_cert': True,
+        'cookies': {}
     }
 
     app = None
@@ -90,7 +91,7 @@ class Telestaff():
 
 
     def __init__(self, host, 
-                t_user=None, t_pass=None, 
+                t_user=None, t_pass=None, cookies=None,
                 domain=None, d_user=None, d_pass=None,
                 verify_ssl_cert=True, app=None):
         """
@@ -120,10 +121,22 @@ class Telestaff():
         self.creds['domain_pass'] = d_pass
         self.creds['verify_ssl_cert'] = verify_ssl_cert
 
+        if isinstance(cookies, str):
+            self.setCookiesFromString(cookies)
+
         # Initilize session object   
         self.session = requests.Session()
+        self.session.cookies.update(self.creds['cookies'])
         self.session.verify = self.creds['verify_ssl_cert']
         self.session.headers.update({'User-Agent': self.userAgent})
+
+
+    def setCookiesFromString(self, cookie_string: str):
+        for cookie in cookie_string.split(';'):
+            cookie_parts = cookie.strip().split('=', 1)
+            if len(cookie_parts) == 2:  # Only add if there's a key and value
+                key, value = cookie_parts
+                self.creds['cookies'][key] = value
 
 
     def resourceURL(self, resource_type=None, date=None):
