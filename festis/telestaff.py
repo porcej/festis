@@ -245,50 +245,7 @@ class Telestaff():
 
         return nameAndNotes
 
-    #  ****************************************************************************
-    #  Replaced on 2017/10/07 to accept telestaffs new pending status convention
-    # def getMemberInfo(soup):
-    #     data = {"name": "", "specialties": "", "badge": "", "workcode": "", "exceptioncode": "", "isRequest": False, "startTime": "", "endTime": "", "duration": 24}
-
-    #     # Get Personal Info
-    #     resourceDisplay = soup.find("div", attrs={"data-field": "resourcedisplay"})
-    #     if resourceDisplay.has_attr('data-popup-title'):
-    #         data["name"] = resourceDisplay['data-popup-title']
-
-    #     if resourceDisplay.has_attr('data-popup-specialties'):
-    #         data["specialties"] = resourceDisplay['data-popup-specialties']
-
-    #     fid = soup.find("div", attrs={"data-field": "idcolumn"})
-    #     if fid.has_attr("data-id"):
-    #         data['badge'] = fid['data-id']
-
-    #     # Get Work Code Info
-    #     codes = soup.find("div", attrs={"data-field": "workcode"})
-    #     if codes.has_attr('data-popup-title'):
-    #         data['workcode'] = codes['data-popup-title']
-    #         if codes.has_attr('style'):
-    #             data['workcode_style'] = codes['style']
-    #         if codes.has_attr('data-popup-request'):
-    #             data['isRequest'] = codes['data-popup-request']
-    #         exceptCode = codes.find("span",  { "class" : "exceptionCode" })
-    #         data["exceptioncode"] = exceptCode.text;
-
-    #     # Get work time info
-    #     times = soup.find("div", attrs={"class": "shiftTimes", "data-popup-title": "From"})
-    #     if times.has_attr('data-popup-value'):
-    #         data['startTime'] = times['data-popup-value']
-
-    #     times = soup.find("div", attrs={"class": "shiftTimes", "data-popup-title": "Through"})
-    #     if times.has_attr('data-popup-value'):
-    #         data['endTime'] = times['data-popup-value']
-
-    #     times = soup.find("div", attrs={"class": "shiftDuration"})
-    #     if times.has_attr('data-popup-value'):
-    #         data['duration'] = times['data-popup-value']
-
-    #     return data
-
-    #  ****************************************************************************
+     #  ****************************************************************************
     #  Replaced on 2017/10/07 to accept telestaffs new pending status convention
     #  Updated on 2018/03/12 to handle workcode formating using SVG
     #  Updated on 2018/07/26 to handle nonWorking code and unassignedPosition code
