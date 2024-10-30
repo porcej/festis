@@ -46,7 +46,9 @@ __vcs_id__ = '$Id$'
 __version__ = '0.1.2' #Versioning: http://www.python.org/dev/peps/pep-0386/
 
 
-import urllib, base64, requests
+import urllib, base64
+
+from requests import Session, RequestException, HTTPError, codes
 
 # Optionally import requests_ntlm for the case where
 # NTLM auth is not requeired
@@ -125,7 +127,7 @@ class Telestaff():
             self.setCookiesFromString(cookies)
 
         # Initilize session object   
-        self.session = requests.Session()
+        self.session = Session()
         self.session.cookies.update(self.creds['cookies'])
         self.session.verify = self.creds['verify_ssl_cert']
         self.session.headers.update({'User-Agent': self.userAgent})
@@ -517,7 +519,13 @@ class Telestaff():
 
         # Updated 25/12/2019
         # Removed verify=True, as this is done in the session.verify statement above
-        loginPage = self.session.get(self.resourceURL('loginPage'));
+        try:
+            loginPage = self.session.get(self.resourceURL('loginPage'));
+            loginPage.raise_for_status()
+        except HTTPError as e:
+            print(f'HTTP Error: {e}')
+        except RequestException as e:
+            print(f"Failed to download webpage: {e}")
 
         # Added 3/5/2018 
         # This fails to NTLM Auth if an unathorized error is received
@@ -535,11 +543,8 @@ class Telestaff():
             login['status_code'] = loginPage.status_code
             return login
 
-        soup = BeautifulSoup(loginPage.text.encode('utf-8'), self.parser)
-        
         # Find the token in soup tree and through away everything else
-        self.creds['telestaff']['CSRFToken'] = \
-                soup.find("input", {"name": "CSRFToken"}).get('value');
+        self.creds['telestaff']['CSRFToken'] = self.get_csrf_token(loginPage)
         
 
         # Login in to Workforce Telestaff
@@ -562,17 +567,30 @@ class Telestaff():
 
         return login
 
+    def get_csrf_token(self, page_response: 'requests.Response') -> str:
+        """
+        Extracts CSRF token from the page response.
+
+        Args:
+            page_response (requests.Response): The response object containing the page HTML.
+
+        Returns:
+            Optional[str]: The CSRF token if found, otherwise `None`.
+        """
+        soup = BeautifulSoup(page_response.text.encode('utf-8'), self.parser)
+        csrf_element = soup.find("input", {"name": "CSRFToken"})
+        return csrf_element.get('value') if csrf_element else None
 
     def getTelestaffData(self, path, handler):
 
         login = self.doLogin()
 
         # Check to see if login suceceed:
-        if (login['status_code'] == requests.codes.ok):
+        if (login['status_code'] == codes.ok):
 
             response = self.session.get(path)
 
-            if (response.status_code == requests.codes.ok):
+            if (response.status_code == codes.ok):
                 if (not response.url.endswith('login')):
                     return {'status_code': response.status_code, 'data': handler(response.text)}
                 else:
@@ -626,7 +644,7 @@ class Telestaff():
 
         # Authenticate against the system and establish a session
         login = self.doLogin()
-        if (login['status_code'] == requests.codes.ok):
+        if (login['status_code'] == codes.ok):
 
             if not date:
                 date = self.currentDate()
@@ -656,7 +674,10 @@ class Telestaff():
             response = self.session.get(self.resourceURL('pickListData'))
 
             
-            if (response.status_code == requests.codes.ok):
+            try:
+                response = self.session.get(self.resourceURL('pickListData'))
+                response.raise_for_status()  # Check if the request was successful
+
                 if (not response.url.endswith('login')):
                     # rjson = handler(response.text)
                     data = response.json();
@@ -664,8 +685,9 @@ class Telestaff():
                     return json.dumps({'status_code': '200', 'data': data})
                 else:
                     return {'status_code': '403', 'data': 'Username or password not found.'}
-            else:
-                return {'status_code': response.status_code}
+            except requests.exceptions.RequestException as e:
+                print(f'\n\n\nHERE IS THE ERROR: {e}\n\n\n')
+                return {'status_code': e}
         return {'status_code': '403', 'data': 'Authentication or authorization issue. Code: ' + str(login['status_code']) + '.' }
 
 
