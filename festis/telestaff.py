@@ -11,7 +11,7 @@ Changelog:
                     parse notes from titles
     - 2017-10-07 - Update getMemberInfo to look for data-popup-status to have a value of "Request Pending" instead of the existance of a "request field"
     - 2017-12-04 - Updated parseCalendar to handle pending requests (isRequest)
-    - 2018-02-08 - Updated doLogin to handle Contact Log Requests
+    - 2018-02-08 - Updated do_login to handle Contact Log Requests
     - 2018-02-08 - Updated parseWebstaffroster to check for roster lenght (make sure it is there before attempting to parse it)
     - 2018-03-12 - Updated getMemberInfo to handle formating workcodes from SVGs
     - 2018-06-12 - Refactored to be Object Oriented
@@ -24,13 +24,13 @@ Changelog:
     - 2018-12-25 - Updated several typos
     - 2019-05-23 - Updated getRosterNameField to remove etra status and make the regex more efficient
     - 2019-05-23 - Updated getTelestaffPicklist to handle picklists outside the default
-    - 2019-12-25 - Updated doLogin to resepect the object's 'verify_ssl_cert' state
-    - 2019-12-25 - Extracted all Telestaff Resource End Points to resourceURL() method
+    - 2019-12-25 - Updated do_login to resepect the object's 'verify_ssl_cert' state
+    - 2019-12-25 - Extracted all Telestaff Resource End Points to resource_url() method
     - 2019-12-25 - Added handler method that returns the parser for resource type requested
     =======================================================================================
     * 2019-12-25 - Moved to version 0.0.7
     - 2021-02-09 - Updated to Support WF 7.1.16
-    - 2021-05-01 - corrected error in fetching picklist by quaoting keyboard picklist in resourceURL call
+    - 2021-05-01 - corrected error in fetching picklist by quaoting keyboard picklist in resource_url call
     - 2021-09-02 - Added the ability to select picklist by chain
     - 2021-09-02 - Added full roster functionality
     - 2022-11-13 - Added position id
@@ -45,10 +45,11 @@ __license__ = 'New-style BSD'
 __vcs_id__ = '$Id$'
 __version__ = '0.1.2' #Versioning: http://www.python.org/dev/peps/pep-0386/
 
-
-import urllib, base64
+import base64
+from urllib.parse import urlparse
 
 from requests import Session, RequestException, HTTPError, codes
+from typing import Union, Dict, Optional
 
 # Optionally import requests_ntlm for the case where
 # NTLM auth is not requeired
@@ -141,42 +142,43 @@ class Telestaff():
                 self.creds['cookies'][key] = value
 
 
-    def resourceURL(self, resource_type=None, date=None):
+    def resource_url(self, resource_type: Optional[str] = None, date: Optional[str] = None) -> Union[str, bool]:
         """
-        Accepts optional resource_type (string) and date (string)
-        and returns a string representation of that resource's url
-        Defaults:
-            resource_type: 'dashboard'
-            date: The current date
-        Returns false for unknown resource types
+        Constructs and returns the URL for a specified resource type and date.
+        
+        Args:
+            resource_type (Optional[str]): The type of resource for which to get the URL (default is 'dashboard').
+            date (Optional[str]): The date to include in the URL if applicable (default is the current date).
+
+        Returns:
+            Union[str, bool]: The full URL as a string if the resource type is known, otherwise `False`.
         """
+        # Set default values if parameters are not provided
+        resource_type = resource_type or 'dashboard'
+        date = date or self.current_date()
 
-        # If resourse is not provided assume dashboard
-        if resource_type is None:
-            resource_type = 'dashboard'
-
-        # If date is not provided, assume today
-        if date is None:
-            date = self.currentDate()
-
+        # URL paths by resource type
         urls = {
-            'loginPage':        '/login',
-            'login':            '/processWebLogin',
-            'contactLog':       '/contactLog?myContactLog=true',
-            'dispoContactLog':  '/contactLog?dispositionedUnrespondedLogs=true',
-            'pickList':         '/schedule/pickList/fromCalendar/' + date + '/675?returnUrl=%2Fcalendar%2F'+ date + '%2F675',
-            'customPickList':   '/schedule/pickList/setPickListProperty',
-            'pickListData':     '/schedule/pickList/tableAjaxData',
-            'roster':           '/roster/d%5B' + date + '%5D/',
-            'rosterFull':       '/roster/d%5B' + date + '%5D?rosterViewId=-1_3',
-            'calendar':         '/calendar/' + date + '/list/',
-            'dashboard':        '/calendar/dashboard'
+            'loginPage': '/login',
+            'logout': '/logout',
+            'login': '/processWebLogin',
+            'contactLog': '/contactLog?myContactLog=true',
+            'dispoContactLog': '/contactLog?dispositionedUnrespondedLogs=true',
+            'pickList': f'/schedule/pickList/fromCalendar/{date}/675?returnUrl=%2Fcalendar%2F{date}%2F675',
+            'customPickList': '/schedule/pickList/setPickListProperty',
+            'pickListData': '/schedule/pickList/tableAjaxData',
+            'roster': f'/roster/d%5B{date}%5D/',
+            'rosterFull': f'/roster/d%5B{date}%5D?rosterViewId=-1_3',
+            'calendar': f'/calendar/{date}/list/',
+            'dashboard': '/calendar/dashboard'
         }
 
-        if resource_type not in urls.keys():
+        # Retrieve the URL for the specified resource type, or return False if unknown
+        resource_path = urls.get(resource_type)
+        if not resource_path:
             return False
 
-        return self.makeURL(urls[resource_type])
+        return self.makeURL(resource_path)
 
     def handler(self, kind='dashboard'):
         """
@@ -214,17 +216,38 @@ class Telestaff():
         return self.url + path
 
 
-    def currentDate(self):
+    def current_date(self) -> str:
+        """Returns the current date in 'YYYYMMDD' format."""
         return datetime.now().strftime('%Y%m%d')
 
-    def cleanString(self, str):
-        return str.strip().replace('\n', '').replace('\r', '').replace('\t', '')
+    def clean_string(self, text: str) -> str:
+        """
+        Cleans a string by stripping whitespace and removing newline, carriage return, and tab characters.
 
-    def getcleanString(self, soup, cls, elm='div'):
-        """Returns a clean text string for text componet of the elm with class cls"""
+        Args:
+            text (str): The string to be cleaned.
+
+        Returns:
+            str: The cleaned string.
+        """
+        return text.strip().replace('\n', '').replace('\r', '').replace('\t', '')
+
+    def get_clean_string(self, soup: BeautifulSoup, class_name: str, element: str = 'div') -> Union[str, bool]:
+        """
+        Returns a cleaned text string for the text content of the specified HTML element with the given class.
+
+        Args:
+            soup (BeautifulSoup): The BeautifulSoup object containing the HTML.
+            class_name (str): The class name to search for within the HTML element.
+            element (str): The type of HTML element to search for (default is 'div').
+
+        Returns:
+            Union[str, bool]: The cleaned text string if found; otherwise, `False`.
+        """
         try:
-            return self.cleanString(soup.find(elm, attrs={'class': cls}).text)
-        except:
+            target_element = soup.find(element, attrs={'class': class_name})
+            return self.clean_string(target_element.text) if target_element else False
+        except AttributeError:
             return False
 
 
@@ -260,7 +283,7 @@ class Telestaff():
 
         return nameAndNotes
 
-     #  ****************************************************************************
+    #  ****************************************************************************
     #  Replaced on 2017/10/07 to accept telestaffs new pending status convention
     #  Updated on 2018/03/12 to handle workcode formating using SVG
     #  Updated on 2018/07/26 to handle nonWorking code and unassignedPosition code
@@ -427,7 +450,7 @@ class Telestaff():
                 event = {'type': 'unknown', 'isRequest': False}
 
                 # Get Event Name
-                name = self.getcleanString(eventsoup, 'listItemName')
+                name = self.get_clean_String(eventsoup, 'listItemName')
                 if name:
                     event['name'] = name
 
@@ -436,7 +459,7 @@ class Telestaff():
                     event['isRequest'] = True
 
                 # Get Event Location
-                loc = self.getcleanString(eventsoup, 'listItemWhere')
+                loc = self.get_clean_String(eventsoup, 'listItemWhere')
                 if loc:
                     event['location'] = loc
 
@@ -445,20 +468,20 @@ class Telestaff():
                     event['type'] = eventsoup['data-attrtype']
 
                 # Get Event time as a range
-                time = self.getcleanString(eventsoup, 'listItemStartTime')
+                time = self.get_clean_String(eventsoup, 'listItemStartTime')
                 if time:
                     event['time'] = time
 
                 # Get Event length (typically in hours)
-                length = self.getcleanString(eventsoup, 'listItemHours')
+                length = self.get_clean_String(eventsoup, 'listItemHours')
                 if length:
                     event['length'] = length
 
-                code = self.getcleanString(eventsoup, "exception")
+                code = self.get_clean_String(eventsoup, "exception")
                 if code:
                     event['exception-code'] = code
 
-                # exceptionCode = self.getcleanString(eventsoup, 'exception')
+                # exceptionCode = self.get_clean_String(eventsoup, 'exception')
                 # if exceptionCodeexception-code:
                 #     event['exception-code'] = exceptionCode
 
@@ -467,7 +490,7 @@ class Telestaff():
                 box = box.div
 
                 if box.has_attr('style'):
-                    event['icon_style'] = self.cleanString(box['style'])
+                    event['icon_style'] = self.clean_string(box['style'])
 
                 events.append(event)
 
@@ -485,7 +508,7 @@ class Telestaff():
         # Create Soup Tree from HTML
         soup = BeautifulSoup(raw.encode('utf-8'), self.parser)
 
-        header = self.getcleanString(soup, cls='listHeader')
+        header = self.get_clean_String(soup, cls='listHeader')
         if header:
             m = re.search('\(([^)]*)\)?\s?([\S]*)[\D]*([^a-zA-Z]*)', header)
             if m.group(1):
@@ -511,63 +534,88 @@ class Telestaff():
 
         return data
 
-    # Logs in and returns session object... if login fails returns false
-    def doLogin(self):
+    def do_login(self) -> Union[Dict[str, int], bool]:
+        """
+        Logs in to the application and returns a response with status code or False on failure.
 
-        # Holder for HTTP response codes
-        login = { 'status_code': '403' }
-
-        # Updated 25/12/2019
-        # Removed verify=True, as this is done in the session.verify statement above
+        Returns:
+            Union[Dict[str, int], bool]: Login response with 'status_code' on success, or `False` on failure.
+        """
         try:
-            loginPage = self.session.get(self.resourceURL('loginPage'));
-            loginPage.raise_for_status()
+            # Initial login page request
+            login_page_response = self.session.get(self.resource_url('loginPage'))
+
+            # Handle NTLM authentication if necessary
+            if login_page_response.status_code == codes.unauthorized and HttpNtlmAuth:
+                self.session.auth = HttpNtlmAuth(self.domainUser(), self.creds['domain_pass'])
+                login_page_response = self.session.get(self.resource_url('loginPage'))
+
+            login_page_response.raise_for_status()
+
+
+            # Check if login page was successfully retrieved
+            if login_page_response.status_code != 200:
+                return {'status_code': login_page_response.status_code}
+
+            # Extract CSRF token
+            csrf_token = self.get_csrf_token(login_page_response)
+            if not csrf_token:
+                return False
+            self.creds['telestaff']['CSRFToken'] = csrf_token
+
+            # Submit login credentials
+            login_response = self.session.post(self.resource_url('login'), data=self.creds['telestaff'])
+
+            # Check for contact log disposition requirements
+            if login_response.url.endswith('/checkContactLog'):
+                self.session.get(self.resource_url('contactLog?myContactLog=true'))
+                self.session.get(self.resource_url('contactLog?dispositionedUnrespondedLogs=true'))
+
+            return {'status_code': login_response.status_code}
+
         except HTTPError as e:
-            print(f'HTTP Error: {e}')
+            return {'status_code': f'Login failed with HTTP Error {e}'}
         except RequestException as e:
-            print(f"Failed to download webpage: {e}")
+            print(traceback.format_exc())
+            return {'status_code': f'Login failed with error {e}'}
+        except Exception as e:
+            return {'status_code': f'Login failed with unknown error {e}'}
 
-        # Added 3/5/2018 
-        # This fails to NTLM Auth if an unathorized error is received
-        # Updated on 16/12/2018 - cleaned up NTLM Auth
-        if (loginPage.status_code == 401) and (HttpNtlmAuth is not None):
-            
-            # Build NTLM Authenication Object
-            self.session.auth = HttpNtlmAuth( \
-                                             self.domainUser(),\
-                                             self.creds['domain_pass'])
+    def do_logout(self) -> Union[Dict[str, int], bool]:
+        """
+        Logs out of the Telestaff application and returns a response with status code or False on failure.
 
-            loginPage = self.session.get(self.resourceURL('loginPage'));
-            
-        if (loginPage.status_code != 200):
-            login['status_code'] = loginPage.status_code
-            return login
+        Returns:
+            Union[Dict[str, int], bool]: Logout response with 'status_code' on success, or `False` on failure.
+        """
+        try:
+            # Initial login page request
+            logout_page_response = self.session.get(self.resource_url('logout'))
 
-        # Find the token in soup tree and through away everything else
-        self.creds['telestaff']['CSRFToken'] = self.get_csrf_token(loginPage)
-        
+            logout_page_response.raise_for_status()
+            if self.check_if_logged_out(logout_page_response.url):
+                return {'status_code': 'Logged out'}
 
-        # Login in to Workforce Telestaff
-        # 28-12-2019 - Changed login location from login to processWebLogin
-        loginResponse = self.session.post( self.resourceURL('login'), \
-                                           data=self.creds['telestaff'])
-        #   loginResponse = login['session'].post(makeURL('/login'), data=payload)
-        
-        # Added 2/8/2018 to handle Check Contact Log Messages
-        # We simply check if we are on the checkContactLog page
-        #    If we have a checkContactLog page then we must:
-        #        Firstly) View Contact Log (/contactLog?myContactLog=true)
-        #        Secondly) Disposition Unresponded logs (/contactLog?dispositionedUnrespondedLogs=true)
-        # If we are we request to disposition the contact log for this session 
-        if (loginResponse.url.endswith('/checkContactLog')):
-            contactResponse = self.session.get(self.resourceURL('contectLog'))
-            loginResponse = self.session.get(self.resourceURL('dispoContactLog'))
-        
-        login['status_code'] = loginResponse.status_code
+        except HTTPError as e:
+            return {'status_code': f'Logout failed with HTTP Error {e}'}
+        except RequestException as e:
+            return {'status_code': f'Logout failed with error {e}'}
+        except Exception as e:
+            return {'status_code': f'Logout failed with unknown error {e}'}
 
-        return login
+    def check_if_logged_out(self, url: str) -> bool:
+        """
+        Checks if the given URL corresponds to the login page.
 
-    def get_csrf_token(self, page_response: 'requests.Response') -> str:
+        Args:
+            url (str): The URL to check.
+
+        Returns:
+            bool: True if the URL matches the login page, False otherwise.
+        """
+        return urlparse(url).path == self.resource_url(resource_type='loginPage')
+
+    def get_csrf_token(self, page_response: 'requests.Response') -> Optional[str]:
         """
         Extracts CSRF token from the page response.
 
@@ -583,7 +631,7 @@ class Telestaff():
 
     def getTelestaffData(self, path, handler):
 
-        login = self.doLogin()
+        login = self.do_login()
 
         # Check to see if login suceceed:
         if (login['status_code'] == codes.ok):
@@ -623,12 +671,12 @@ class Telestaff():
             date - None
         """
         handler = self.parseCalendarDashboard
-        action = self.resourceURL()
+        action = self.resource_url()
 
         if  kind == 'picklist':
             return self.getTelestaffPicklist(date, chain)
         else:
-            action = self.resourceURL(resource_type=kind, date=date)
+            action = self.resource_url(resource_type=kind, date=date)
             handler = self.handler(kind=kind)
 
         if jsonExport:
@@ -636,59 +684,65 @@ class Telestaff():
         return self.getTelestaffData(action, handler)
 
 
-    def getTelestaffPicklist(self, date='', chain=None):
+    def get_telestaff_picklist(self, date: str = '', chain: Optional[str] = None) -> Union[Dict[str, Union[str, int]], str]:
         """
-        Fetch a Telestaff picklist.
-        If picklist is None, fetchs default picklist else fetches listed picklist
-        """
-
-        # Authenticate against the system and establish a session
-        login = self.doLogin()
-        if (login['status_code'] == codes.ok):
-
-            if not date:
-                date = self.currentDate()
-            thisHost = urllib.parse.urlparse(self.url).hostname
-
-            rURL = self.resourceURL(resource_type='pickList', date=date)
-            self.session.headers.update({
-                    'Host': thisHost,
-                    'Referer': rURL,
-                    'Accept': 'application/json, text/javascript, */*; q=0.01',
-                    'X-Requested-With': 'XMLHttpRequest'
-                })
-
-            response = self.session.get(rURL)
-
-            if chain is not None:
-                picklist = {}
-                soup = BeautifulSoup(response.text.encode('utf-8'), self.parser)
-                picklist['date'] = soup.find("input", {"name": "date"}).get('value')
-                picklist['regionTbl'] = soup.find("select", {"name": "regionTbl"}).find('option', selected=True).get('value')
-                picklist['shiftTbl'] = soup.find("select", {"name": "shiftTbl"}).find('option', selected=True).get('value')
-                picklist['strategyChainTbl'] = chain
-                picklist['CSRFToken'] = soup.find("input", {"name": "CSRFToken"}).get('value');
-
-                response = self.session.post(self.resourceURL('customPickList'), data=picklist)
-
-            response = self.session.get(self.resourceURL('pickListData'))
-
+        Fetch a Telestaff picklist. If `chain` is provided, fetches a custom picklist.
+        
+        Args:
+            date (str): The date for which to fetch the picklist.
+            chain (Optional[str]): Custom chain parameter for specialized picklist retrieval.
             
-            try:
-                response = self.session.get(self.resourceURL('pickListData'))
-                response.raise_for_status()  # Check if the request was successful
+        Returns:
+            Union[Dict[str, Union[str, int]], str]: A dictionary with `status_code` and `data` or JSON-encoded string with picklist data.
+        """
+        # Set default date if none provided
+        date = date or self.current_date()
+        r_url = self.resource_url(resource_type='pickList', date=date)
+        
+        # Update session headers
+        this_host = urlparse(self.url).hostname
+        self.session.headers.update({
+            'Host': this_host,
+            'Referer': r_url,
+            'Accept': 'application/json, text/javascript, */*; q=0.01',
+            'X-Requested-With': 'XMLHttpRequest'
+        })
+        
+        # Initial picklist request
+        response = self.session.get(r_url)
+        response.raise_for_status()  # Ensure request succeeded
 
-                if (not response.url.endswith('login')):
-                    # rjson = handler(response.text)
-                    data = response.json();
-                    data['type'] = 'picklist';
-                    return json.dumps({'status_code': '200', 'data': data})
-                else:
-                    return {'status_code': '403', 'data': 'Username or password not found.'}
-            except requests.exceptions.RequestException as e:
-                print(f'\n\n\nHERE IS THE ERROR: {e}\n\n\n')
-                return {'status_code': e}
-        return {'status_code': '403', 'data': 'Authentication or authorization issue. Code: ' + str(login['status_code']) + '.' }
+        # If chain parameter is provided, fetch custom picklist
+        if chain is not None:
+            soup = BeautifulSoup(response.text, self.parser)
+            picklist_data = {
+                'date': soup.find("input", {"name": "date"}).get('value', ''),
+                'regionTbl': soup.find("select", {"name": "regionTbl"}).find('option', selected=True).get('value', ''),
+                'shiftTbl': soup.find("select", {"name": "shiftTbl"}).find('option', selected=True).get('value', ''),
+                'strategyChainTbl': chain,
+                'CSRFToken': soup.find("input", {"name": "CSRFToken"}).get('value', '')
+            }
+            
+            # Submit the custom picklist request
+            self.session.post(self.resource_url('customPickList'), data=picklist_data)
+
+        # Fetch the final picklist data
+        try:
+            response = self.session.get(self.resource_url('pickListData'))
+            response.raise_for_status()  # Check for successful data retrieval
+            
+            # Check if still logged in
+            if response.url.endswith('login'):
+                return {'status_code': '403', 'data': 'Username or password not found.'}
+
+            # Process and return JSON data
+            data = response.json()
+            data['type'] = 'picklist'
+            return json.dumps({'status_code': '200', 'data': data})
+
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching picklist data: {e}")
+            return {'status_code': '500', 'data': 'Failed to retrieve picklist data.'}
 
 
 
