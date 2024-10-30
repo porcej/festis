@@ -72,7 +72,7 @@ setup(
     long_description = LONG_DESCRIPTION,
     long_description_content_type = "text/markdown",
     author       = 'Joe Porcelli',
-    author_email = 'joe@kt3i.com',
+    author_email = 'porcej@gmail.com',
     url          = 'http://github.com/porcej/festis',
     license      = 'MIT',
     platforms    = [ 'any' ],

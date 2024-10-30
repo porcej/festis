@@ -34,15 +34,16 @@ Changelog:
     - 2021-09-02 - Added the ability to select picklist by chain
     - 2021-09-02 - Added full roster functionality
     - 2022-11-13 - Added position id
-
+    =======================================================================================
+    * 2024-10-30 - Moved to version 0.1.2
 
 """
 
 __author__ = 'Joe Porcelli (porcej@gmail.com)'
-__copyright__ = 'Copyright (c) 2017 Joe Porcelli'
+__copyright__ = 'Copyright (c) 2024 Joe Porcelli'
 __license__ = 'New-style BSD'
 __vcs_id__ = '$Id$'
-__version__ = '0.1.0' #Versioning: http://www.python.org/dev/peps/pep-0386/
+__version__ = '0.1.2' #Versioning: http://www.python.org/dev/peps/pep-0386/
 
 
 import urllib, base64, requests
