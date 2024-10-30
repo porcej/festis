@@ -3,7 +3,7 @@
 # -*- coding: ascii -*-
 
 """
-Festis.telestaff: downlaods data from telestaff
+Festis.telestaff: downloads data from telestaff
 
 
 Changelog:
@@ -49,7 +49,7 @@ import base64
 from urllib.parse import urlparse
 
 from requests import Session, RequestException, HTTPError, codes
-from typing import Union, Dict, Optional
+from typing import Any, Callable, Dict, Optional, Union
 
 # Optionally import requests_ntlm for the case where
 # NTLM auth is not requeired
@@ -63,8 +63,8 @@ import logging
 
 
 # Import JSON... Try Simple if its available and default to stdlib
-try: import simplejson as json
-except ImportError: import json
+# try: import simplejson as json
+# except ImportError: import json
 
 
 class Telestaff():
@@ -125,7 +125,7 @@ class Telestaff():
         self.creds['verify_ssl_cert'] = verify_ssl_cert
 
         if isinstance(cookies, str):
-            self.setCookiesFromString(cookies)
+            self.set_cookies_from_string(cookies)
 
         # Initilize session object   
         self.session = Session()
@@ -134,12 +134,37 @@ class Telestaff():
         self.session.headers.update({'User-Agent': self.userAgent})
 
 
-    def setCookiesFromString(self, cookie_string: str):
+    def set_cookies_from_string(self, cookie_string: str) -> None:
+        """
+        Parses a cookie string and sets cookies in the credentials.
+
+        Args:
+            cookie_string (str): A string containing cookies in "key=value" pairs separated by semicolons.
+                                 Example: "cookie1=value1; cookie2=value2"
+        """
+        # Initialize cookies dictionary if not already present
+        self.creds.setdefault('cookies', {})
+
+        # Split and add each cookie
         for cookie in cookie_string.split(';'):
             cookie_parts = cookie.strip().split('=', 1)
-            if len(cookie_parts) == 2:  # Only add if there's a key and value
+            if len(cookie_parts) == 2:
                 key, value = cookie_parts
                 self.creds['cookies'][key] = value
+
+
+    def build_response_dict(self, status_code: int, data: Union[str, dict, list]) -> Dict[str, Union[int, str, dict, list]]:
+        """
+        Builds a response dictionary with a status code and data payload.
+
+        Args:
+            status_code (int): The HTTP status code of the response.
+            data (Union[str, dict, list]): The data payload of the response, which can be a string, dictionary, or list.
+
+        Returns:
+            Dict[str, Union[int, str, dict, list]]: A dictionary containing the status code and data payload.
+        """
+        return {'status_code': status_code, 'data': data}
 
 
     def resource_url(self, resource_type: Optional[str] = None, date: Optional[str] = None) -> Union[str, bool]:
@@ -178,39 +203,60 @@ class Telestaff():
         if not resource_path:
             return False
 
-        return self.makeURL(resource_path)
+        return self.make_url(resource_path)
 
-    def handler(self, kind='dashboard'):
+    def handler(self, kind: str = 'dashboard') -> Union[Callable, bool]:
         """
-        Accepts a handler name and returns a link to its handler
-        if the handler is unknown, returns false
-        """
-        if kind == 'dashboard':
-            return self.parseCalendarDashboard
-        elif kind == 'roster':
-            return self.parseWebStaffRoster
-        elif kind == 'rosterFull':
-            return self.parseWebStaffRoster
-        elif kind == 'calendar':
-            return self.parseFullCalendar
-        else:
-            return False
+        Returns the appropriate handler function based on the provided `kind` value.
 
+        Args:
+            kind (str): The type of handler to retrieve (e.g., 'dashboard', 'roster').
 
-    def domainUser(self):
+        Returns:
+            Union[Callable, bool]: The handler function if `kind` is known; otherwise, `False`.
         """
-        Mashes Authdomain and user to form auth-user
-        """
-        return self.creds['domain'] + self.creds['domain_user'];
+        handlers = {
+            'dashboard': self.parse_calendar_dashboard,
+            'roster': self.parse_web_staff_roster,
+            'rosterFull': self.parse_web_staff_roster,
+            'calendar': self.parse_full_calendar
+        }
+
+        return handlers.get(kind, False)
 
 
-    def makeURL(self, path=''):
+    def domain_user(self) -> str:
         """
-        Build URL's for Telestaff Paths
+        Combines `domain` and `domain_user` from credentials to form an auth-user string.
+
+        Returns:
+            str: The combined domain and user string (e.g., "example.comuser").
         """
-        if path == '':
+        try:
+            return self.creds['domain'] + self.creds['domain_user']
+        except KeyError as e:
+            raise KeyError(f"Missing credential key: {e}")
+
+
+    def make_url(self, path: Optional[str] = None) -> str:
+        """
+        Constructs a full URL for Telestaff paths based on the base URL.
+
+        Args:
+            path (Optional[str]): The path to append to the base URL. If `None` or an empty string is provided,
+                                  the base URL is returned.
+
+        Returns:
+            str: The constructed full URL.
+        
+        Example:
+            If `self.url` is "https://example.com" and `path` is "login", this method returns "https://example.com/login".
+        """
+        # Return the base URL if no path is specified
+        if not path:
             return self.url
 
+        # Ensure path starts with a forward slash
         if not path.startswith('/'):
             path = '/' + path
         return self.url + path
@@ -250,44 +296,70 @@ class Telestaff():
         except AttributeError:
             return False
 
+    def get_roster_date(self, src: BeautifulSoup) -> Optional[str]:
+        """
+        Extracts and returns the text string for the current roster date from the given HTML source.
 
-    def getRosterDate(self, src):
-        """Returns the text string for current roster date from Workforce Telstaff 5.4.5.2"""
-        return src.findAll("div", { "class" : "dateName" })[0].span.text
+        Args:
+            src (BeautifulSoup): The BeautifulSoup object containing the HTML source to search.
+
+        Returns:
+            Optional[str]: The text of the roster date if found, otherwise `None`.
+        """
+        try:
+            date_div = src.find_all("div", {"class": "dateName"})[0]
+            return date_div.span.text.strip() if date_div and date_div.span else None
+        except (IndexError, AttributeError) as e:
+            # Log or handle exception as needed
+            logger.warning(f"Error extracting roster date: {e}")
+            return None
 
 
-    def getRosterNameField(self, soup):
-        """Returns name and notes for Workforce Telestaff's Name Div"""
-        nameClasses = ['dateName', 'organizationName', 'battalionName', 'shiftName', 'unitName', 'positionName']
-        nameAndNotes = {"title": '', "notes":'', "isSurrpressed": False}
-        
-        tmp = soup.find("div", {"class": nameClasses})
+    def get_roster_name_field(self, soup: BeautifulSoup) -> Dict[str, Union[str, bool]]:
+        """
+        Extracts and returns the name and notes for the Workforce Telestaff's name div.
+
+        Args:
+            soup (BeautifulSoup): The BeautifulSoup object containing the HTML source.
+
+        Returns:
+            Dict[str, Union[str, bool]]: A dictionary containing the 'title', 'notes', and 'isSuppressed' status.
+        """
+        name_classes = ['dateName', 'organizationName', 'battalionName', 'shiftName', 'unitName', 'positionName']
+        name_and_notes = {"title": '', "notes": '', "isSuppressed": False}
+
+        # Locate the div with any of the specified classes
+        tmp = soup.find("div", {"class": name_classes})
 
         if tmp:
-            if tmp.span.text.strip():
-                titleSpan = tmp.span.text.strip()
-            else:
-                titleSpan = tmp.find("span", {"class": 'positionNameText'}).text
+            # Extract the title, falling back to 'positionNameText' if necessary
+            title_span = tmp.span.text.strip() if tmp.span and tmp.span.text.strip() else tmp.find("span", {"class": 'positionNameText'}).text
+            name_and_notes["title"] = title_span
 
-            nameAndNotes["title"] = titleSpan
+            # Parse title span using regex
+            match = re.search(r'^({?(\.)?[^{]*){?([^}]*)}?', title_span)
+            if match and match.lastindex and match.lastindex > 1:
+                name_and_notes["title"] = match.group(1).strip() if match.group(1) else name_and_notes["title"]
+                name_and_notes['isSuppressed'] = bool(match.group(2))
+                name_and_notes['notes'] = match.group(3).strip() if match.group(3) and not name_and_notes['isSuppressed'] else name_and_notes['notes']
 
-            m = re.search('^({?(\.)?[^{]*){?([^}]*)}?', titleSpan)
-            if m.lastindex and m.lastindex > 1:
-                if m.group(1):
-                    nameAndNotes["title"] = m.group(1).strip()
-                if m.group(2):
-                    nameAndNotes['isSurrpressed'] = True
-                if m.group(3):
-                    if not nameAndNotes['isSurrpressed']:
-                        nameAndNotes['notes'] = m.group(3).strip()
-
-        return nameAndNotes
+        return name_and_notes
 
     #  ****************************************************************************
     #  Replaced on 2017/10/07 to accept telestaffs new pending status convention
     #  Updated on 2018/03/12 to handle workcode formating using SVG
     #  Updated on 2018/07/26 to handle nonWorking code and unassignedPosition code
-    def getMemberInfo(self, soup):
+    def get_member_info(self, soup: BeautifulSoup) -> Dict[str, Union[int, str, bool]]:
+        """
+        Extracts and returns member information from a Telestaff HTML element.
+
+        Args:
+            soup (BeautifulSoup): The BeautifulSoup object containing the HTML source.
+
+        Returns:
+            Dict[str, Union[int, str, bool]]: A dictionary containing member information such as id, name,
+                                               work code, shift times, and additional status flags.
+        """
         data = {"id": 0, 
                 "name": "", 
                 "specialties": "", 
@@ -302,43 +374,46 @@ class Telestaff():
                 "isAssigned": True,
                 "isVacant": False}
 
-        data['id'] = soup['data-id']
+        # Extract the member ID
+        data['id'] = soup.get('data-id', 0)
 
-        # Look for nonWorking Code
+        # Check for non-working status
         if( soup.find('div', attrs={"class": 'nonWorking'})):
             data["isWorking"] = False
 
-        # Look for isAssigned 
+        # Check for assignment status
         if (soup.find('div', attrs={"class": "unassignedPosition"})):
             data['isAssigned'] = False
 
-        # Is this position vacant?
+        # Check if the position is vacant
         if (soup.find('div', attrs={"class": 'vacancyDisplay'})):
             data['isVacant'] = True
 
-        # Get Personal Info
+        # Extract personal information
         resourceDisplay = soup.find("div", attrs={"data-field": "resourcedisplay"})
         if resourceDisplay.has_attr('data-popup-title'):
             data["name"] = resourceDisplay['data-popup-title']
 
+        # Extract personal specialties
         if resourceDisplay.has_attr('data-popup-specialties'):
             data["specialties"] = resourceDisplay['data-popup-specialties']
 
+        # Extract badge ID
         fid = soup.find("div", attrs={"data-field": "idcolumn"})
         if fid.has_attr("data-id"):
             data['badge'] = fid['data-id']
 
-        # Get Work Code Info
+        # Extract work code information
         codes = soup.find("div", attrs={"data-field": "workcode"})
         if codes.has_attr('data-popup-title'):
             data['workcode'] = codes['data-popup-title']
             
-            # Added on 2018/03/12 to handle formating iconogrpahy
+            # Handle exception code styling
             styleSpan = codes.find('span', attrs={'class': 'exceptionCode'})
             if styleSpan.has_attr('style'):
                 data['workcode_style'] = styleSpan['style']
                 
-            # rect = codes.find('svg', attrs={'class': 'rosterSvg'}).rect 
+            # Check for SVG style (supports different versions)
             rect = codes.find('svg', attrs={'class': 'svg'}).rect   # Support WF Telestaff 7.1.16
             if rect.has_attr('style'):
                 data['workcode_style'] += "background-color: " + rect['style'].replace('fill:','')
@@ -346,36 +421,44 @@ class Telestaff():
             #         if codes.has_attr('style'):
             #             data['workcode_style'] = codes['style']
 
-            # Added on 2017-`0-07 to deal with new status field and the removal of the request field
+            # Check pending approval status
             if codes.has_attr('data-popup-statusenum'):
                 data['isRequest'] =  codes['data-popup-statusenum'] == "APPROVAL_PENDING"
 
 
-            # Still support the old telestaff request field
+            # Support legacy request field
             if codes.has_attr('data-popup-request'):        
                 data['isRequest'] = codes['data-popup-request']
             exceptCode = codes.find("span",  { "class" : "exceptionCode" })
             data["exceptioncode"] = exceptCode.text;
 
-        # Get work time info
-        times = soup.find("div", attrs={"class": "shiftTimes", "data-popup-title": "From"})
-        if times.has_attr('data-popup-value'):
-            data['startTime'] = times['data-popup-value']
+        # Extract work time information
+        start_time = soup.find("div", attrs={"class": "shiftTimes", "data-popup-title": "From"})
+        if start_time.has_attr('data-popup-value'):
+            data['startTime'] = start_time['data-popup-value']
 
-        times = soup.find("div", attrs={"class": "shiftTimes", "data-popup-title": "Through"})
-        if times.has_attr('data-popup-value'):
-            data['endTime'] = times['data-popup-value']
+        end_time = soup.find("div", attrs={"class": "shiftTimes", "data-popup-title": "Through"})
+        if end_time.has_attr('data-popup-value'):
+            data['endTime'] = end_time['data-popup-value']
 
-        times = soup.find("div", attrs={"class": "shiftDuration"})
-        if times.has_attr('data-popup-value'):
-            data['duration'] = times['data-popup-value']
+        duration = soup.find("div", attrs={"class": "shiftDuration"})
+        if duration.has_attr('data-popup-value'):
+            data['duration'] = duration['data-popup-value']
 
         return data
 
 
-    def parseRoster(self, soup, parent="root"):
-        """Recursivly parses a Workforce Telestaff Roster"""
-        # Dict object to hold data
+    def parse_roster(self, soup: BeautifulSoup, parent: str = "root") -> Dict[str, Any]:
+        """
+        Recursively parses a Workforce Telestaff roster, extracting group and member information.
+
+        Args:
+            soup (BeautifulSoup): The BeautifulSoup object containing the HTML source.
+            parent (str): The name of the parent group, default is "root".
+
+        Returns:
+            Dict[str, Any]: A dictionary containing parsed roster data, organized by group type.
+        """
         data = {}
         idClasses = ['idDate', 'idInstitution', 'idAgency', 'idBatallion', 'idShift', 'idStation', 'idUnit', 'idPosition']
 
@@ -394,24 +477,31 @@ class Telestaff():
 
             groupType = li['class'][0][2:]
             groupData = {}
-            groupData.update(self.getRosterNameField(li))
+            groupData.update(self.get_roster_name_field(li))
 
             # Check if this is a person, if so look for more data
             if "Position" == li['class'][0][2:]:
-                groupData.update(self.getMemberInfo(li))
+                groupData.update(self.get_member_info(li))
             else:
                 # Nope, not a person... lets see if there are any people hanging around here
                 if li.find("li", {"class": idClasses}):
-                    groupData.update(self.parseRoster(li, li['class'][0][2:]))
+                    groupData.update(self.parse_roster(li, li['class'][0][2:]))
             
             data.setdefault(groupType, []).append(groupData)
 
         return data
 
 
-    def parseWebStaffRoster(self, raw):
-        """"Takes a raw HTML page, finds Telestaff Roster and Parses it"""
+    def parse_web_staff_roster(self, raw: str) -> Dict[str, Union[str, Dict]]:
+        """
+        Parses a raw HTML page to locate and parse the Telestaff roster.
 
+        Args:
+            raw (str): The raw HTML content of the Telestaff roster page.
+
+        Returns:
+            Dict[str, Union[str, Dict]]: A dictionary containing parsed roster data or an error message.
+        """
         # Create Soup Tree from HTML
         soup = BeautifulSoup(raw.encode('utf-8'), self.parser)
 
@@ -425,13 +515,13 @@ class Telestaff():
             return {'error': 'No roster found'}
 
         # And now we parse the roster...
-        roster = self.parseRoster(soup)
+        roster = self.parse_roster(soup)
         roster['type'] = 'roster'
         return roster
 
 
     # 12/4/2017 - Added pending field to event dictionary to repsent pending events
-    def parseCalendar(self, soup):
+    def parse_calendar(self, soup):
         """"Takes a raw HTML page, finds Telestaff Calendar and parses it"""
         daysData = []
 
@@ -450,7 +540,7 @@ class Telestaff():
                 event = {'type': 'unknown', 'isRequest': False}
 
                 # Get Event Name
-                name = self.get_clean_String(eventsoup, 'listItemName')
+                name = self.get_clean_string(eventsoup, class_name='listItemName')
                 if name:
                     event['name'] = name
 
@@ -459,7 +549,7 @@ class Telestaff():
                     event['isRequest'] = True
 
                 # Get Event Location
-                loc = self.get_clean_String(eventsoup, 'listItemWhere')
+                loc = self.get_clean_string(eventsoup, class_name='listItemWhere')
                 if loc:
                     event['location'] = loc
 
@@ -468,16 +558,16 @@ class Telestaff():
                     event['type'] = eventsoup['data-attrtype']
 
                 # Get Event time as a range
-                time = self.get_clean_String(eventsoup, 'listItemStartTime')
+                time = self.get_clean_string(eventsoup, class_name='listItemStartTime')
                 if time:
                     event['time'] = time
 
                 # Get Event length (typically in hours)
-                length = self.get_clean_String(eventsoup, 'listItemHours')
+                length = self.get_clean_string(eventsoup, class_name='listItemHours')
                 if length:
                     event['length'] = length
 
-                code = self.get_clean_String(eventsoup, "exception")
+                code = self.get_clean_string(eventsoup, class_name="exception")
                 if code:
                     event['exception-code'] = code
 
@@ -501,36 +591,65 @@ class Telestaff():
                             })
         return daysData
 
-    def parseFullCalendar(self, raw):
-        """"Takes a raw HTML page, finds Telestaff Calendar and parses it"""
+
+    def parse_full_calendar(self, raw: str) -> Dict[str, str]:
+        """
+        Takes a raw HTML page, finds and parses the Telestaff calendar details.
+
+        Args:
+            raw (str): The raw HTML content of the Telestaff calendar page.
+
+        Returns:
+            Dict[str, str]: A dictionary containing the parsed calendar data.
+        """
         data = {'type': 'calendar'}
 
         # Create Soup Tree from HTML
         soup = BeautifulSoup(raw.encode('utf-8'), self.parser)
 
-        header = self.get_clean_String(soup, cls='listHeader')
+        # Extract header information
+        header = self.get_clean_string(soup, class_name='listHeader')
         if header:
-            m = re.search('\(([^)]*)\)?\s?([\S]*)[\D]*([^a-zA-Z]*)', header)
-            if m.group(1):
-                data['owner'] = m.group(1).strip()
-            if m.group(2):
-                data["start"] = m.group(2).strip()
-            if m.group(3):
-                data['end'] = m.group(3).strip()
-        soup.find({'class': ["centerContainer", "fullWidth", "topMargin"]})
-        soup = soup.find('div', attrs={'class': ['fullWidth', 'topMarginSmall']})
-        data['days'] = self.parseCalendar(soup)
+            match = re.search(r'\(([^)]*)\)?\s?([\S]*)[\D]*([^a-zA-Z]*)', header)
+            if match:
+                data['owner'] = match.group(1).strip() if match.group(1) else ''
+                data["start"] = match.group(2).strip() if match.group(2) else ''
+                data['end'] = match.group(3).strip() if match.group(3) else ''
+
+        # Locate calendar content
+        calendar_container = soup.find('div', attrs={'class': ['fullWidth', 'topMarginSmall']})
+        if calendar_container:
+            data['days'] = self.parse_calendar(calendar_container)
+        else:
+            data['days'] = []  # Default empty list if calendar days are not found
+
         return data
 
-    def parseCalendarDashboard(self, raw):
-        data = {'type': 'dashboard'}
 
+    def parse_calendar_dashboard(self, raw: str) -> Dict[str, str]:
+        """
+        Parses the HTML of the calendar dashboard, extracting the date range and daily data.
+
+        Args:
+            raw (str): The raw HTML content of the calendar dashboard page.
+
+        Returns:
+            Dict[str, str]: A dictionary containing the type, date range, and parsed days data.
+        """
+        data = {'type': 'dashboard'}
+        
         # Create Soup Tree from HTML
         soup = BeautifulSoup(raw.encode('utf-8'), self.parser)
 
-        # Pull out the daterange for the calendar
-        data['daterange'] = soup.find("span", {"class": "dateRange"}).text.strip()
-        data['days'] = self.parseCalendar(soup)
+        # Pull out the date range for the calendar, handling possible missing elements
+        date_range_element = soup.find("span", {"class": "dateRange"})
+        if date_range_element:
+            data['daterange'] = date_range_element.text.strip()
+        else:
+            data['daterange'] = 'Unknown'  # Default or placeholder if not found
+
+        # Parse calendar days
+        data['days'] = self.parse_calendar(soup)
 
         return data
 
@@ -555,7 +674,8 @@ class Telestaff():
 
             # Check if login page was successfully retrieved
             if login_page_response.status_code != 200:
-                return {'status_code': login_page_response.status_code}
+                data = f'Application error loging onto Teletsaff: {login_page_response.status_code}'
+                return self.build_response_dict(500, data)
 
             # Extract CSRF token
             csrf_token = self.get_csrf_token(login_page_response)
@@ -571,15 +691,16 @@ class Telestaff():
                 self.session.get(self.resource_url('contactLog?myContactLog=true'))
                 self.session.get(self.resource_url('contactLog?dispositionedUnrespondedLogs=true'))
 
-            return {'status_code': login_response.status_code}
+            return self.build_response_dict(login_response.status_code, data)
 
         except HTTPError as e:
-            return {'status_code': f'Login failed with HTTP Error {e}'}
+            return self.build_response_dict(500, "Login failed with HTTP Error: {e}")
         except RequestException as e:
-            print(traceback.format_exc())
+            return self.build_response_dict(500, "Login failed with error: {e}")
             return {'status_code': f'Login failed with error {e}'}
         except Exception as e:
-            return {'status_code': f'Login failed with unknown error {e}'}
+            return self.build_response_dict(500, "Login failed with unknown error: {e}")
+
 
     def do_logout(self) -> Union[Dict[str, int], bool]:
         """
@@ -594,14 +715,14 @@ class Telestaff():
 
             logout_page_response.raise_for_status()
             if self.check_if_logged_out(logout_page_response.url):
-                return {'status_code': 'Logged out'}
-
+                return self.build_response_dict(200, "Logged out")
         except HTTPError as e:
-            return {'status_code': f'Logout failed with HTTP Error {e}'}
+            return self.build_response_dict(500, "Logout failed with HTTP Error: {e}")
         except RequestException as e:
+            return self.build_response_dict(500, "Logout failed with error: {e}")
             return {'status_code': f'Logout failed with error {e}'}
         except Exception as e:
-            return {'status_code': f'Logout failed with unknown error {e}'}
+            return self.build_response_dict(500, "Logout failed with unknown error: {e}")
 
     def check_if_logged_out(self, url: str) -> bool:
         """
@@ -613,7 +734,7 @@ class Telestaff():
         Returns:
             bool: True if the URL matches the login page, False otherwise.
         """
-        return urlparse(url).path == self.resource_url(resource_type='loginPage')
+        return urlparse(url).path == '/login'
 
     def get_csrf_token(self, page_response: 'requests.Response') -> Optional[str]:
         """
@@ -629,59 +750,71 @@ class Telestaff():
         csrf_element = soup.find("input", {"name": "CSRFToken"})
         return csrf_element.get('value') if csrf_element else None
 
-    def getTelestaffData(self, path, handler):
 
-        login = self.do_login()
+    def get_telestaff_data(self, path: str, handler: Callable[[str], Union[dict, str]]) -> Dict[str, Union[str, int]]:
+        """
+        Fetches Telestaff data, and processes it with a specified handler.
 
-        # Check to see if login suceceed:
-        if (login['status_code'] == codes.ok):
+        Args:
+            path (str): The URL path for the Telestaff data.
+            handler (Callable[[str], Union[dict, str]]): A function to process the response text.
 
+        Returns:
+            Dict[str, Union[str, int]]: A dictionary with the status code and processed data or an error message.
+        """
+        try:
             response = self.session.get(path)
-
-            if (response.status_code == codes.ok):
-                if (not response.url.endswith('login')):
-                    return {'status_code': response.status_code, 'data': handler(response.text)}
-                else:
-                    return {'status_code': '403', 'data': 'Telestaff username and password combination not.'}
-            else:
-                return {'status_code': response.status_code}
-        else:
-            return {'status_code': str(login['status_code']), 'data': str(login) }
-        return {'status_code': '403', 'data': 'Authentication or authorization issue. Code--: ' + str(login['status_code']) + '.' }
+            response.raise_for_status()
+            if self.check_if_logged_out(response.url):
+                return self.build_response_dict(403, 'Telestaff username and password combination is incorrect.')
+            return self.build_response_dict(response.status_code, handler(response.text))
+        except HTTPError as e:
+            return self.build_response_dict(response.status_code, e)
+        except RequestException as e:
+            return self.build_response_dict(500, e)
 
 
-    def getTelestaffCalendar(self, date=None, jsonExport=False):
-        return self.getTelestaff(kind='calendar', date=date, jsonExport=jsonExport)
+    def get_telestaff_calendar(self, date: Optional[str] = None) -> Union[str, dict]:
+        """Fetches the Telestaff calendar data."""
+        return self.get_telestaff(kind='calendar', date=date)
 
 
-    def getTelestaffRoster(self, date=None, jsonExport=False):
-        return self.getTelestaff(kind='roster', date=date, jsonExport=jsonExport)
+    def get_telestaff_roster(self, date: Optional[str] = None) -> Union[str, dict]:
+        """Fetches the Telestaff roster data."""
+        return self.get_telestaff(kind='roster', date=date)
 
 
-    def getTelestaffDashboard(self, date=None, jsonExport=False):
-        return self.getTelestaff(kind='dashboard', date=None, jsonExport=jsonExport)
+    def get_telestaff_dashboard(self, date: Optional[str] = None) -> Union[str, dict]:
+        """Fetches the Telestaff dashboard data."""
+        return self.get_telestaff(kind='dashboard', date=date)
 
 
-    def getTelestaff(self, kind='dashboard', date=None, jsonExport=True, chain=None):
+    def get_telestaff(self, kind: str = 'dashboard', date: Optional[str] = None, chain: Optional[str] = None) -> Union[str, dict]:
         """
-        Gets Data from telestaff of type kind
-        If jsonExport is true, returns Json, otherwise returns data object
-        Defaults:
-            kind - Dashboard
-            date - None
+        Retrieves Telestaff data of the specified type.
+
+        Args:
+            kind (str): The type of data to retrieve (default is 'dashboard').
+            date (Optional[str]): The date for the data (default is `None`, meaning current date).
+            json_export (bool): If `True`, returns JSON; otherwise, returns a data object (default is `True`).
+            chain (Optional[str]): Chain parameter for specialized requests (applicable for picklists).
+
+        Returns:
+            Union[str, dict]: JSON-encoded string if `json_export` is `True`, otherwise a dictionary with data.
         """
-        handler = self.parseCalendarDashboard
+        # Determine handler and action based on kind
+        handler = self.parse_calendar_dashboard
         action = self.resource_url()
 
-        if  kind == 'picklist':
-            return self.getTelestaffPicklist(date, chain)
-        else:
-            action = self.resource_url(resource_type=kind, date=date)
-            handler = self.handler(kind=kind)
+        # Handle different types of Telestaff data requests
+        if kind == 'picklist':
+            return self.get_telestaff_picklist(date, chain)
+        
+        action = self.resource_url(resource_type=kind, date=date)
+        handler = self.handler(kind=kind)
 
-        if jsonExport:
-            return json.dumps(self.getTelestaffData(action, handler))
-        return self.getTelestaffData(action, handler)
+        # Fetch data and return in the requested format
+        return self.get_telestaff_data(action, handler)
 
 
     def get_telestaff_picklist(self, date: str = '', chain: Optional[str] = None) -> Union[Dict[str, Union[str, int]], str]:
@@ -733,16 +866,16 @@ class Telestaff():
             
             # Check if still logged in
             if response.url.endswith('login'):
-                return {'status_code': '403', 'data': 'Username or password not found.'}
+                return {'status_code': 403, 'data': 'Username or password not found.'}
 
             # Process and return JSON data
             data = response.json()
             data['type'] = 'picklist'
-            return json.dumps({'status_code': '200', 'data': data})
+            return self.build_response_dict(200, data)
 
         except requests.exceptions.RequestException as e:
-            print(f"Error fetching picklist data: {e}")
-            return {'status_code': '500', 'data': 'Failed to retrieve picklist data.'}
+            logging.warning(f"Error fetching picklist data: {e}")
+            return self.build_response_dict(500, "Failed to retrieve picklist data: {e}")
 
 
 
