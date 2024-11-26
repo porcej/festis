@@ -34,9 +34,9 @@ Changelog:
 import sys
 import codecs
 try:
-    from setuptools import setup, Command
+    from setuptools import setup, Command, find_packages
 except ImportError:
-    from distutils.core import setup, Command
+    from distutils.core import setup, Command, find_packages
 
 from festis import __version__
 
@@ -44,6 +44,10 @@ VERSION          = __version__
 DESCRIPTION      = 'A tiny Python client for Workforce Telestaff.'
 with codecs.open('README.md', 'r', encoding='UTF-8') as readme:
     LONG_DESCRIPTION = ''.join(readme)
+
+def read_requirements():
+    with open('requirements.txt') as f:
+        return f.read().splitlines()
 
 CLASSIFIERS      = [ 'Intended Audience :: Developers',
                      'License :: OSI Approved :: MIT License',
@@ -77,6 +81,6 @@ setup(
     license      = 'MIT',
     platforms    = [ 'any' ],
     packages     = packages,
-    install_requires     = REQUIREMENTS,
+    install_requires    = read_requirements(),
     classifiers  = CLASSIFIERS
 )
