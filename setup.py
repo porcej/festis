@@ -31,16 +31,29 @@ Changelog:
 
 """
 
-import sys
 import codecs
+import os
+import re
+
 try:
     from setuptools import setup, Command, find_packages
 except ImportError:
     from distutils.core import setup, Command, find_packages
 
-from festis import __version__
 
-VERSION          = __version__
+def read_version():
+    """Read version without importing festis (avoids requests during pip build)."""
+    here = os.path.abspath(os.path.dirname(__file__))
+    path = os.path.join(here, 'festis', '_version.py')
+    with open(path, encoding='utf-8') as f:
+        text = f.read()
+    m = re.search(r"^__version__\s*=\s*['\"]([^'\"]*)['\"]", text, re.MULTILINE)
+    if not m:
+        raise RuntimeError('Could not parse __version__ from festis/_version.py')
+    return m.group(1)
+
+
+VERSION          = read_version()
 DESCRIPTION      = 'A tiny Python client for Workforce Telestaff.'
 with codecs.open('README.md', 'r', encoding='UTF-8') as readme:
     LONG_DESCRIPTION = ''.join(readme)

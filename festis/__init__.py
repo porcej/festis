@@ -5,11 +5,20 @@
 Festis.telestaff: downloads data from telestaff
 """
 
+import importlib
+
 __author__ = 'Joe Porcelli (porcej@gmail.com)'
 __copyright__ = 'Copyright (c) 2017 Joe Porcelli'
 __license__ = 'New-style BSD'
 __vcs_id__ = '$Id$'
-__version__ = '0.1.3' #Versioning: http://www.python.org/dev/peps/pep-0386/
+
+from festis._version import __version__
+
+__all__ = ['__version__', 'telestaff']
 
 
-from festis import telestaff
+def __getattr__(name):
+    """Lazy-load telestaff so `pip install` / setuptools never import requests pre-install."""
+    if name == 'telestaff':
+        return importlib.import_module('.telestaff', __name__)
+    raise AttributeError(f'module {__name__!r} has no attribute {name!r}')

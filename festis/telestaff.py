@@ -45,7 +45,8 @@ __author__ = 'Joe Porcelli (porcej@gmail.com)'
 __copyright__ = 'Copyright (c) 2024 Joe Porcelli'
 __license__ = 'New-style BSD'
 __vcs_id__ = '$Id$'
-__version__ = '0.1.3' #Versioning: http://www.python.org/dev/peps/pep-0386/
+
+from festis._version import __version__
 
 from urllib.parse import urlparse
 
