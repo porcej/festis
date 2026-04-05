@@ -51,21 +51,10 @@ def read_requirements():
 
 CLASSIFIERS      = [ 'Intended Audience :: Developers',
                      'License :: OSI Approved :: MIT License',
-                     'Programming Language :: Python',
-                     'Programming Language :: Python :: 2.7',
-                     'Programming Language :: Python :: 3.4',
-                     'Programming Language :: Python :: 3.5',
-                     'Programming Language :: Python :: 3.6',
-                     'Programming Language :: Python :: 3.7',
+                     'Programming Language :: Python :: 3',
+                     'Programming Language :: Python :: 3 :: Only',
                      'Topic :: Software Development :: Libraries :: Python Modules',
                    ]
-
-REQUIREMENTS    = [
-                    'beautifulsoup4>=4.6.0',
-                    'DateTime>=4.2',
-                    'requests>=2.21.0',
-                    'pyyaml>=4.2b1'
-                ]
 
 packages     = [ 'festis' ]
 
@@ -81,6 +70,7 @@ setup(
     license      = 'MIT',
     platforms    = [ 'any' ],
     packages     = packages,
+    python_requires  = '>=3.8',
     install_requires    = read_requirements(),
     classifiers  = CLASSIFIERS
 )

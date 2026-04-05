@@ -2,7 +2,7 @@
 # -*- coding: ascii -*-
 
 """
-Sample App to demonstrage dumping a festis roster to file
+Sample app: log in, fetch roster, write JSON to roster.json
 
 Changelog:
     - 2018-12-16 - Initial Commit
@@ -15,23 +15,12 @@ __copyright__ = "Copyright (c) 2018 Joseph Porcelli"
 __license__ = "MIT"
 
 import os
-import sys
-import logging
 import json
 from festis import telestaff as ts
 
 
-
-# Here we handle some command line input funkyness
-if sys.version_info < (3, 0):
-    reload(sys)
-    sys.setdefaultencoding('utf8')
-else:
-    raw_input = input
-
-
 TS_DOMAIN = os.environ.get('TS_DOMAIN') or 'NTLM DOMAIN FOR AUTHENTICATION'
-TS_SERVER = os.environ.get('TS_SERVER') or 'TELESTAFF URL'
+TS_SERVER = os.environ.get('TS_SERVER') or 'https://telestaff.example.org'
 
 TS_USER = os.environ.get('TS_USER') or 'TELESTAFF USER'
 TS_PASS = os.environ.get('TS_PASS') or 'TELESTAFF PASSWORD'
@@ -48,7 +37,7 @@ if __name__ == '__main__':
                                 d_user=D_USER, \
                                 d_pass=D_PASS)
 
+    telestaff.do_login()
+
     with open('roster.json', 'w') as jfh:
-        json.dump(telestaff.getTelestaff(kind='roster', date=date, jsonExport=True ), jfh)
-
-
+        json.dump(telestaff.get_telestaff(kind='roster', date=date), jfh, indent=2)

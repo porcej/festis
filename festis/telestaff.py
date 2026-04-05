@@ -36,6 +36,8 @@ Changelog:
     - 2022-11-13 - Added position id
     =======================================================================================
     * 2024-10-30 - Moved to version 0.1.2
+    - 2026-04-04 - Persist session cookies after get_telestaff; added get_cookies()
+    - 2026-04-04 - Fix do_login return, domain_user NTLM call, f-strings, picklist except; trim deps
 
 """
 
@@ -43,9 +45,8 @@ __author__ = 'Joe Porcelli (porcej@gmail.com)'
 __copyright__ = 'Copyright (c) 2024 Joe Porcelli'
 __license__ = 'New-style BSD'
 __vcs_id__ = '$Id$'
-__version__ = '0.1.2' #Versioning: http://www.python.org/dev/peps/pep-0386/
+__version__ = '0.1.3' #Versioning: http://www.python.org/dev/peps/pep-0386/
 
-import base64
 from urllib.parse import urlparse
 
 from requests import Session, RequestException, HTTPError, codes
@@ -58,7 +59,6 @@ except ImportError: HttpNtlmAuth = None
 from bs4 import BeautifulSoup
 from datetime import datetime
 import re
-import yaml
 import logging
 
 
@@ -133,6 +133,14 @@ class Telestaff():
         self.session.verify = self.creds['verify_ssl_cert']
         self.session.headers.update({'User-Agent': self.userAgent})
 
+    def _sync_cookies_from_session(self) -> None:
+        """Copy cookies from the requests session into creds (after responses update the jar)."""
+        self.creds.setdefault('cookies', {})
+        self.creds['cookies'].update(self.session.cookies.get_dict())
+
+    def get_cookies(self) -> Dict[str, str]:
+        """Return a copy of cookies last synced from the session (e.g. after get_telestaff)."""
+        return dict(self.creds.get('cookies', {}))
 
     def set_cookies_from_string(self, cookie_string: str) -> None:
         """
@@ -666,7 +674,7 @@ class Telestaff():
 
             # Handle NTLM authentication if necessary
             if login_page_response.status_code == codes.unauthorized and HttpNtlmAuth:
-                self.session.auth = HttpNtlmAuth(self.domainUser(), self.creds['domain_pass'])
+                self.session.auth = HttpNtlmAuth(self.domain_user(), self.creds['domain_pass'])
                 login_page_response = self.session.get(self.resource_url('loginPage'))
 
             login_page_response.raise_for_status()
@@ -691,15 +699,15 @@ class Telestaff():
                 self.session.get(self.resource_url('contactLog?myContactLog=true'))
                 self.session.get(self.resource_url('contactLog?dispositionedUnrespondedLogs=true'))
 
-            return self.build_response_dict(login_response.status_code, data)
+            self._sync_cookies_from_session()
+            return self.build_response_dict(login_response.status_code, login_response.url)
 
         except HTTPError as e:
-            return self.build_response_dict(500, "Login failed with HTTP Error: {e}")
+            return self.build_response_dict(500, f"Login failed with HTTP Error: {e}")
         except RequestException as e:
-            return self.build_response_dict(500, "Login failed with error: {e}")
-            return {'status_code': f'Login failed with error {e}'}
+            return self.build_response_dict(500, f"Login failed with error: {e}")
         except Exception as e:
-            return self.build_response_dict(500, "Login failed with unknown error: {e}")
+            return self.build_response_dict(500, f"Login failed with unknown error: {e}")
 
 
     def do_logout(self) -> Union[Dict[str, int], bool]:
@@ -712,17 +720,18 @@ class Telestaff():
         try:
             # Initial login page request
             logout_page_response = self.session.get(self.resource_url('logout'))
+            self._sync_cookies_from_session()
 
             logout_page_response.raise_for_status()
             if self.check_if_logged_out(logout_page_response.url):
                 return self.build_response_dict(200, "Logged out")
+            return self.build_response_dict(logout_page_response.status_code, logout_page_response.url)
         except HTTPError as e:
-            return self.build_response_dict(500, "Logout failed with HTTP Error: {e}")
+            return self.build_response_dict(500, f"Logout failed with HTTP Error: {e}")
         except RequestException as e:
-            return self.build_response_dict(500, "Logout failed with error: {e}")
-            return {'status_code': f'Logout failed with error {e}'}
+            return self.build_response_dict(500, f"Logout failed with error: {e}")
         except Exception as e:
-            return self.build_response_dict(500, "Logout failed with unknown error: {e}")
+            return self.build_response_dict(500, f"Logout failed with unknown error: {e}")
 
     def check_if_logged_out(self, url: str) -> bool:
         """
@@ -764,6 +773,7 @@ class Telestaff():
         """
         try:
             response = self.session.get(path)
+            self._sync_cookies_from_session()
             response.raise_for_status()
             if self.check_if_logged_out(response.url):
                 return self.build_response_dict(403, 'Telestaff username and password combination is incorrect.')
@@ -843,6 +853,7 @@ class Telestaff():
         
         # Initial picklist request
         response = self.session.get(r_url)
+        self._sync_cookies_from_session()
         response.raise_for_status()  # Ensure request succeeded
 
         # If chain parameter is provided, fetch custom picklist
@@ -858,10 +869,12 @@ class Telestaff():
             
             # Submit the custom picklist request
             self.session.post(self.resource_url('customPickList'), data=picklist_data)
+            self._sync_cookies_from_session()
 
         # Fetch the final picklist data
         try:
             response = self.session.get(self.resource_url('pickListData'))
+            self._sync_cookies_from_session()
             response.raise_for_status()  # Check for successful data retrieval
             
             # Check if still logged in
@@ -873,9 +886,9 @@ class Telestaff():
             data['type'] = 'picklist'
             return self.build_response_dict(200, data)
 
-        except requests.exceptions.RequestException as e:
+        except RequestException as e:
             logging.warning(f"Error fetching picklist data: {e}")
-            return self.build_response_dict(500, "Failed to retrieve picklist data: {e}")
+            return self.build_response_dict(500, f"Failed to retrieve picklist data: {e}")
 
 
 

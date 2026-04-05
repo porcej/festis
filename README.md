@@ -1,130 +1,64 @@
 # festis
 
-A really simple python client library for Workforce Telestaff.
+A small Python client library for Kronos Workforce Telestaff (HTML scraping + authenticated session handling).
 
-## Getting Started
+## Prerequisites
 
-These instructions will get you a copy of the project up and running on your local machine for development and testing purposes. See deployment for notes on how to deploy the project on a live system.
+Python 3.8+ is recommended. Install dependencies:
 
-### Prerequisites
-
-This module is designed to work with `Python 3.4+`.  `Python 2` may work, your milage may very.  The `requirements.txt` file contains the required libraries.  
-
-```
-python3.4+
-$pip install -r requirements.txt
+```bash
+pip install -r requirements.txt
 ```
 
+Optional: [requests-ntlm](https://github.com/requests/requests-ntlm) if Telestaff sits behind NTLM challenge-response authentication:
 
-### Optional Prerequisites
-
-The python [requests-ntlm](https://github.com/requests/requests-ntlm) module can optionally be used to authenticate with Workforce Telestaff installations behind a NTLM Challenge-Response authorization mechanizm.  
-
+```bash
+pip install requests-ntlm
 ```
 
-pip install requests_ntlm
+## Installation
 
-``` 
-
-
-### Installation
-
-This package can be installed from github:
-
-```
-$ git clone http://github.com/porcej/festis
-$ cd festis
-$ python3 setup.py install
+```bash
+git clone https://github.com/porcej/festis.git
+cd festis
+pip install .
 ```
 
-### Removal
+## Usage
 
-
-```
-$ pip uninstall festis
-```
-
-### Usage
-
-#### Using this module in your application
-
-Import the telestaff class from the festis module
-```
+```python
 from festis import telestaff as ts
+
+telestaff = ts.Telestaff(
+    host="https://telestaff.example.org",
+    t_user="...",
+    t_pass="...",
+    domain="...",
+    d_user="...",
+    d_pass="...",
+    cookies=None,  # optional: "name=value; name2=value2" from a prior session
+)
+
+telestaff.do_login()
+result = telestaff.get_telestaff(kind="roster", date=None)
+# result is {"status_code": int, "data": ...}
+cookies = telestaff.get_cookies()
 ```
 
+See `sample.py` and `samplefile.py` for runnable examples.
 
+## Development tests
 
-Initilize a telestaff object and request the desired data 
-
-```
-telestaff = ts.Telestaff(host=current_app.config['TS_SERVER'],  \
-                                    t_user=current_app.config['TS_USER'], \
-                                    t_pass=current_app.config['TS_PASS'], \
-                                    domain=current_app.config['TS_DOMAIN'],  \
-                                    d_user=current_app.config['D_USER'], \
-                                    d_pass=current_app.config['D_PASS'])
-
-telestaff.getTelestaff(kind='roster', date=date, jsonExport=True)
+```bash
+pip install pytest
+pytest
 ```
 
+## Built with
 
-### Sample applicaitons
-
-#### sample.py
-
-The sample applicaiton, `sample.py` demonstrates using a911 to pretty print alert data to the screen.  
-
-```
-Usage: sample.py [options]
-
-Options:
-  -h, --help                show this help message and exit
-  -q, --quiet               set logging to ERROR
-  -d, --debug               set logging to DEBUG
-  -v, --verbose             set logging to COMM
-  -a AREG, --aid=AREG       Active911 Registration ID
-```
-
-
-#### samplefile.py
-The example applicaiton, `samplefile.py` demonstrates using a911's Active911 class to save alert messages as json files in a predefined directory.
-
-```
-Usage: samplefile.py [options]
-
-Options:
-  -h, --help            show this help message and exit
-  -q, --quiet           set logging to ERROR
-  -d, --debug           set logging to DEBUG
-  -v, --verbose         set logging to COMM
-  -a AREG, --aid=AREG   Active911 Registration ID
-  -p OPATH, --path=OPATH
-                        Output directory
-```
-
-
-## Built With
-
-* [Anaconda Python](https://conda.io/) - The python framework
-* [Beautiful Soup](https://www.crummy.com/software/BeautifulSoup/) - Screen Scraping
-* [Requests](http://docs.python-requests.org/en/master/) - Request and session handling
-
-## Contributing
-
-Please read [CONTRIBUTING.md](https://gist.github.com/porcej/cc71497a2b455f27bca8c879731e68dc) for details on our code of conduct, and the process for submitting pull requests to us.
-
-## Versioning
-
-We use [SemVer](http://semver.org/) for versioning. For the versions available, see the [tags on this repository](https://github.com/porcej/a911_bridge/tags). 
-
-## Authors
-
-* **Joseph Porcelli** - *Initial work* - [porcej](https://github.com/porcej)
-
-See also the list of [contributors](https://github.com/porcej/a911_bridge/contributors) who participated in this project.
+- [Beautiful Soup](https://www.crummy.com/software/BeautifulSoup/) — HTML parsing
+- [Requests](https://requests.readthedocs.io/) — HTTP session and cookies
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details
-
+MIT — see the `LICENSE` file in this repository.
